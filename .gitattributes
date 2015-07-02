@@ -1,4 +1,2 @@
-*.xpi
-.idea/*
-assets/*
-*.png
+*.psd -text -diff
+*.png -text -diff
