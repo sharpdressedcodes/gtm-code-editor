@@ -1,0 +1,12 @@
+{
+  "name": "gtm-code-editor",
+  "title": "Google Tag Manager Code Editor",
+  "id": "jid1-qj0O4Bn4aUrwAA",
+  "description": "This tool will turn the standard code editor into an Ace code editor",
+  "author": "Greg Kappatos (http://websiteconnect.com.au/)",
+  "homepage": "http://websiteconnect.com.au/",
+  "license": "MPL 2.0",
+  "version": "0.1",
+  "icon": "data/gtm-code-editor-48.png",
+  "icon64": "data/gtm-code-editor-64.png"
+}
