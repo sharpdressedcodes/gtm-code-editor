@@ -47,6 +47,7 @@
             this.initialEl.parentNode.insertBefore(this.el, this.initialEl);
 
             document.addEventListener('keyup', this.onKeyUp.bind(this), false);
+            document.addEventListener('paste', this.onKeyUp.bind(this), false);
 
         },
 
