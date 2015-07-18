@@ -9,6 +9,7 @@
 
         this.initialEl = options.initialEl;
         this.isLegacy = options.isLegacy;
+        this.isHtml = options.isHtml;
         this.margintop = (this.isLegacy ? '0' : '-5') + 'px';
         this.initialEl.style.display = "none";
 
@@ -82,15 +83,42 @@
             }
         },
 
+        getCodeMirrorInstance: function(){
+            try {
+                return unsafeWindow.angular.element('.CodeMirror')[0].CodeMirror;
+            } catch (e){
+                return null;
+            }
+        },
+
+        getCodeFromCodeMirror: function(){
+
+            var editor = this.getCodeMirrorInstance();
+            return editor.getValue();
+
+        },
+
+        setCodeInCodeMirror: function(){
+
+            var editor = this.getCodeMirrorInstance();
+            editor.setValue(this.aceSession.getValue());
+
+        },
+
         buildAce: function () {
 
             this.aceEditor = ace.edit("description");
             this.aceSession = this.aceEditor.getSession();
-            this.aceSession.setMode("ace/mode/javascript");
-            this.aceSession.setValue(this.initialEl.value);
+            //this.aceSession.setMode('ace/mode/' + (this.isHtml ? 'html' : 'javascript'));
+            this.aceSession.setMode('ace/mode/javascript');
+            this.aceSession.setValue(this.isLegacy ? this.initialEl.value : this.getCodeFromCodeMirror());
+            this.aceSession.setFoldStyle('markbeginend');
             this.aceSession.on("change", function () {
-                this.initialEl.value = this.aceSession.getValue();
-                // sharpdressedcodes
+                if (!this.isLegacy) {
+                    this.setCodeInCodeMirror();
+                } else {
+                    this.initialEl.value = this.aceSession.getValue();
+                }
                 this.aceSession.setUseWorker(false);
             }.bind(this));
 
@@ -174,7 +202,8 @@
                         document.getElementById(tab[i]).style.color = "black";
             }
 
-            this.toggleEl.innerHTML = "Screen size";
+            //this.toggleEl.appendChild(document.createTextNode('Screen size'));
+            replaceContent(this.toggleEl, 'Screen Size');
             this.toggleEl.id = "screen";
             this.toggleEl.style.cssText = css;
             this.toggleEl.style.cursor = "pointer";
@@ -187,12 +216,14 @@
                 underlineOff("screen");
             }, false);
 
-            this.slash.innerHTML = '/';
+            //this.slash.appendChild(document.createTextNode('/'));
+            replaceContent(this.slash, '/');
             this.slash.id = "slash";
             this.slash.style.cssText = css;
             this.slash.style.marginRight = ScrollBarWidth + 69 + "px";
 
-            this.toggleEl2.innerHTML = "Color theme";
+            //this.toggleEl2.appendChild(document.createTextNode('Color theme'));
+            replaceContent(this.toggleEl2, 'Color Theme');
             this.toggleEl2.id = "theme";
             this.toggleEl2.style.cssText = css;
             this.toggleEl2.style.cursor = "pointer";
@@ -208,7 +239,8 @@
                 underlineOn("theme");
             }, false);
 
-            this.toggle.innerHTML = 'Toggle:';
+            //this.toggle.appendChild(document.createTextNode('Toggle:'));
+            replaceContent(this.toggle, 'Toggle:');
             this.toggle.id = "toggle";
             this.toggle.style.cssText = css;
             this.toggle.style.marginRight = ScrollBarWidth + 148 + "px";
@@ -223,11 +255,27 @@
 
             if (w.angular && !this.isLegacy && event.target === document.querySelector('textarea.ace_text-input')) {
                 w.angular.element(this.initialEl).change();
+                //var editor = this.getCodeMirrorInstance();
+                //w.CodeMirror.signal(editor, 'change');
             }
 
         }
 
     };
+
+    function replaceContent(element, content){
+
+        while (element.firstChild){
+            element.removeChild(element.firstChild);
+        }
+
+        if (typeof content === 'string'){
+            content = document.createTextNode(content);
+        }
+
+        element.appendChild(content);
+
+    }
 
     function setup(){
 
@@ -297,28 +345,69 @@
         ];
         var initialEl = null;
         var isLegacy = false;
+        var isHtml = true;
+        var b = false;
 
-        for (i = 0, i_ = oldEls.length; i < i_; i++){
-            els = [].slice.call(document.getElementsByName(oldEls[i]));
+        els = [].slice.call(document.getElementsByName(oldEls[0]));
+        if (els.length > 0){
+            initialEl = els[0];
+            isLegacy = true;
+            isHtml = true;
+            b = true;
+        }
+
+        if (!b){
+            els = [].slice.call(document.getElementsByName(oldEls[1]));
             if (els.length > 0){
                 initialEl = els[0];
                 isLegacy = true;
-                break;
-            }
-        }
-        if (!this.isLegacy){
-            for (i = 0, i_ = newEls.length; i < i_; i++){
-                els = [].slice.call(document.getElementsByName(newEls[i]));
-                if (els.length > 0){
-                    initialEl = els[0];
-                    break;
-                }
+                isHtml = false;
+                b = true;
             }
         }
 
+        if (!b){
+            els = [].slice.call(document.getElementsByName(newEls[0]));
+            if (els.length > 0){
+                initialEl = els[0];
+                isLegacy = false;
+                isHtml = true;
+                b = true;
+            }
+        }
+
+        if (!b){
+            els = [].slice.call(document.getElementsByName(newEls[1]));
+            if (els.length > 0){
+                initialEl = els[0];
+                isLegacy = false;
+                isHtml = false;
+                b = true;
+            }
+        }
+
+        //for (i = 0, i_ = oldEls.length; i < i_; i++){
+        //    els = [].slice.call(document.getElementsByName(oldEls[i]));
+        //    if (els.length > 0){
+        //        initialEl = els[0];
+        //        isLegacy = true;
+        //        break;
+        //    }
+        //}
+        //if (!this.isLegacy){
+        //    for (i = 0, i_ = newEls.length; i < i_; i++){
+        //        els = [].slice.call(document.getElementsByName(newEls[i]));
+        //        if (els.length > 0){
+        //            initialEl = els[0];
+        //            break;
+        //        }
+        //    }
+        //}
+
         return {
             initialEl: initialEl,
-            isLegacy: isLegacy
+            isLegacy: isLegacy,
+            isHtml: isHtml
         };
 
     }
@@ -331,6 +420,8 @@
             data.initialEl.style.display !== 'none' &&
             document.getElementById('maxWidth') === null){
             prettyPrinter = new PrettyPrinter(data);
+            //unsafeWindow.gtmAce = prettyPrinter;
+            //console.log(prettyPrinter);
         }
 
     }

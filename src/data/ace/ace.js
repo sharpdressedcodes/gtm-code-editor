@@ -202,7 +202,9 @@ exports.edit = function(el) {
         return el.env.editor;
 
     var doc = exports.createEditSession(dom.getInnerText(el));
-    el.innerHTML = '';
+    while (el.firstChild){
+        el.removeChild(el.firstChild);
+    }
 
     var editor = new Editor(new Renderer(el));
     new MultiSelect(editor);
@@ -224,17 +226,13 @@ exports.createEditSession = function(text, mode) {
     var doc = new EditSession(text, mode);
     doc.setUndoManager(new UndoManager());
     return doc;
-}
+};
 exports.EditSession = EditSession;
 exports.UndoManager = UndoManager;
 });
 
-ace.define('ace/lib/fixoldbrowsers', ['require', 'exports', 'module' , 'ace/lib/regexp', 'ace/lib/es5-shim'], function(require, exports, module) {
-
-
-require("./regexp");
-require("./es5-shim");
-
+ace.define('ace/lib/fixoldbrowsers', ['require', 'exports', 'module' , 'ace/lib/regexp'], function(require, exports, module) {
+    require("./regexp");
 });
  
 ace.define('ace/lib/regexp', ['require', 'exports', 'module' ], function(require, exports, module) {
@@ -306,703 +304,6 @@ ace.define('ace/lib/regexp', ['require', 'exports', 'module' ], function(require
         }
         return -1;
     }
-
-});
-
-ace.define('ace/lib/es5-shim', ['require', 'exports', 'module' ], function(require, exports, module) {
-
-function Empty() {}
-
-if (!Function.prototype.bind) {
-    Function.prototype.bind = function bind(that) { // .length is 1
-        var target = this;
-        if (typeof target != "function") {
-            throw new TypeError("Function.prototype.bind called on incompatible " + target);
-        }
-        var args = slice.call(arguments, 1); // for normal call
-        var bound = function () {
-
-            if (this instanceof bound) {
-
-                var result = target.apply(
-                    this,
-                    args.concat(slice.call(arguments))
-                );
-                if (Object(result) === result) {
-                    return result;
-                }
-                return this;
-
-            } else {
-                return target.apply(
-                    that,
-                    args.concat(slice.call(arguments))
-                );
-
-            }
-
-        };
-        if(target.prototype) {
-            Empty.prototype = target.prototype;
-            bound.prototype = new Empty();
-            Empty.prototype = null;
-        }
-        return bound;
-    };
-}
-var call = Function.prototype.call;
-var prototypeOfArray = Array.prototype;
-var prototypeOfObject = Object.prototype;
-var slice = prototypeOfArray.slice;
-var _toString = call.bind(prototypeOfObject.toString);
-var owns = call.bind(prototypeOfObject.hasOwnProperty);
-var defineGetter;
-var defineSetter;
-var lookupGetter;
-var lookupSetter;
-var supportsAccessors;
-if ((supportsAccessors = owns(prototypeOfObject, "__defineGetter__"))) {
-    defineGetter = call.bind(prototypeOfObject.__defineGetter__);
-    defineSetter = call.bind(prototypeOfObject.__defineSetter__);
-    lookupGetter = call.bind(prototypeOfObject.__lookupGetter__);
-    lookupSetter = call.bind(prototypeOfObject.__lookupSetter__);
-}
-if ([1,2].splice(0).length != 2) {
-    if(function() { // test IE < 9 to splice bug - see issue #138
-        function makeArray(l) {
-            var a = new Array(l+2);
-            a[0] = a[1] = 0;
-            return a;
-        }
-        var array = [], lengthBefore;
-        
-        array.splice.apply(array, makeArray(20));
-        array.splice.apply(array, makeArray(26));
-
-        lengthBefore = array.length; //46
-        array.splice(5, 0, "XXX"); // add one element
-
-        lengthBefore + 1 == array.length
-
-        if (lengthBefore + 1 == array.length) {
-            return true;// has right splice implementation without bugs
-        }
-    }()) {//IE 6/7
-        var array_splice = Array.prototype.splice;
-        Array.prototype.splice = function(start, deleteCount) {
-            if (!arguments.length) {
-                return [];
-            } else {
-                return array_splice.apply(this, [
-                    start === void 0 ? 0 : start,
-                    deleteCount === void 0 ? (this.length - start) : deleteCount
-                ].concat(slice.call(arguments, 2)))
-            }
-        };
-    } else {//IE8
-        Array.prototype.splice = function(pos, removeCount){
-            var length = this.length;
-            if (pos > 0) {
-                if (pos > length)
-                    pos = length;
-            } else if (pos == void 0) {
-                pos = 0;
-            } else if (pos < 0) {
-                pos = Math.max(length + pos, 0);
-            }
-
-            if (!(pos+removeCount < length))
-                removeCount = length - pos;
-
-            var removed = this.slice(pos, pos+removeCount);
-            var insert = slice.call(arguments, 2);
-            var add = insert.length;            
-            if (pos === length) {
-                if (add) {
-                    this.push.apply(this, insert);
-                }
-            } else {
-                var remove = Math.min(removeCount, length - pos);
-                var tailOldPos = pos + remove;
-                var tailNewPos = tailOldPos + add - remove;
-                var tailCount = length - tailOldPos;
-                var lengthAfterRemove = length - remove;
-
-                if (tailNewPos < tailOldPos) { // case A
-                    for (var i = 0; i < tailCount; ++i) {
-                        this[tailNewPos+i] = this[tailOldPos+i];
-                    }
-                } else if (tailNewPos > tailOldPos) { // case B
-                    for (i = tailCount; i--; ) {
-                        this[tailNewPos+i] = this[tailOldPos+i];
-                    }
-                } // else, add == remove (nothing to do)
-
-                if (add && pos === lengthAfterRemove) {
-                    this.length = lengthAfterRemove; // truncate array
-                    this.push.apply(this, insert);
-                } else {
-                    this.length = lengthAfterRemove + add; // reserves space
-                    for (i = 0; i < add; ++i) {
-                        this[pos+i] = insert[i];
-                    }
-                }
-            }
-            return removed;
-        };
-    }
-}
-if (!Array.isArray) {
-    Array.isArray = function isArray(obj) {
-        return _toString(obj) == "[object Array]";
-    };
-}
-var boxedString = Object("a"),
-    splitString = boxedString[0] != "a" || !(0 in boxedString);
-
-if (!Array.prototype.forEach) {
-    Array.prototype.forEach = function forEach(fun /*, thisp*/) {
-        var object = toObject(this),
-            self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                object,
-            thisp = arguments[1],
-            i = -1,
-            length = self.length >>> 0;
-        if (_toString(fun) != "[object Function]") {
-            throw new TypeError(); // TODO message
-        }
-
-        while (++i < length) {
-            if (i in self) {
-                fun.call(thisp, self[i], i, object);
-            }
-        }
-    };
-}
-if (!Array.prototype.map) {
-    Array.prototype.map = function map(fun /*, thisp*/) {
-        var object = toObject(this),
-            self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                object,
-            length = self.length >>> 0,
-            result = Array(length),
-            thisp = arguments[1];
-        if (_toString(fun) != "[object Function]") {
-            throw new TypeError(fun + " is not a function");
-        }
-
-        for (var i = 0; i < length; i++) {
-            if (i in self)
-                result[i] = fun.call(thisp, self[i], i, object);
-        }
-        return result;
-    };
-}
-if (!Array.prototype.filter) {
-    Array.prototype.filter = function filter(fun /*, thisp */) {
-        var object = toObject(this),
-            self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                    object,
-            length = self.length >>> 0,
-            result = [],
-            value,
-            thisp = arguments[1];
-        if (_toString(fun) != "[object Function]") {
-            throw new TypeError(fun + " is not a function");
-        }
-
-        for (var i = 0; i < length; i++) {
-            if (i in self) {
-                value = self[i];
-                if (fun.call(thisp, value, i, object)) {
-                    result.push(value);
-                }
-            }
-        }
-        return result;
-    };
-}
-if (!Array.prototype.every) {
-    Array.prototype.every = function every(fun /*, thisp */) {
-        var object = toObject(this),
-            self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                object,
-            length = self.length >>> 0,
-            thisp = arguments[1];
-        if (_toString(fun) != "[object Function]") {
-            throw new TypeError(fun + " is not a function");
-        }
-
-        for (var i = 0; i < length; i++) {
-            if (i in self && !fun.call(thisp, self[i], i, object)) {
-                return false;
-            }
-        }
-        return true;
-    };
-}
-if (!Array.prototype.some) {
-    Array.prototype.some = function some(fun /*, thisp */) {
-        var object = toObject(this),
-            self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                object,
-            length = self.length >>> 0,
-            thisp = arguments[1];
-        if (_toString(fun) != "[object Function]") {
-            throw new TypeError(fun + " is not a function");
-        }
-
-        for (var i = 0; i < length; i++) {
-            if (i in self && fun.call(thisp, self[i], i, object)) {
-                return true;
-            }
-        }
-        return false;
-    };
-}
-if (!Array.prototype.reduce) {
-    Array.prototype.reduce = function reduce(fun /*, initial*/) {
-        var object = toObject(this),
-            self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                object,
-            length = self.length >>> 0;
-        if (_toString(fun) != "[object Function]") {
-            throw new TypeError(fun + " is not a function");
-        }
-        if (!length && arguments.length == 1) {
-            throw new TypeError("reduce of empty array with no initial value");
-        }
-
-        var i = 0;
-        var result;
-        if (arguments.length >= 2) {
-            result = arguments[1];
-        } else {
-            do {
-                if (i in self) {
-                    result = self[i++];
-                    break;
-                }
-                if (++i >= length) {
-                    throw new TypeError("reduce of empty array with no initial value");
-                }
-            } while (true);
-        }
-
-        for (; i < length; i++) {
-            if (i in self) {
-                result = fun.call(void 0, result, self[i], i, object);
-            }
-        }
-
-        return result;
-    };
-}
-if (!Array.prototype.reduceRight) {
-    Array.prototype.reduceRight = function reduceRight(fun /*, initial*/) {
-        var object = toObject(this),
-            self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                object,
-            length = self.length >>> 0;
-        if (_toString(fun) != "[object Function]") {
-            throw new TypeError(fun + " is not a function");
-        }
-        if (!length && arguments.length == 1) {
-            throw new TypeError("reduceRight of empty array with no initial value");
-        }
-
-        var result, i = length - 1;
-        if (arguments.length >= 2) {
-            result = arguments[1];
-        } else {
-            do {
-                if (i in self) {
-                    result = self[i--];
-                    break;
-                }
-                if (--i < 0) {
-                    throw new TypeError("reduceRight of empty array with no initial value");
-                }
-            } while (true);
-        }
-
-        do {
-            if (i in this) {
-                result = fun.call(void 0, result, self[i], i, object);
-            }
-        } while (i--);
-
-        return result;
-    };
-}
-if (!Array.prototype.indexOf || ([0, 1].indexOf(1, 2) != -1)) {
-    Array.prototype.indexOf = function indexOf(sought /*, fromIndex */ ) {
-        var self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                toObject(this),
-            length = self.length >>> 0;
-
-        if (!length) {
-            return -1;
-        }
-
-        var i = 0;
-        if (arguments.length > 1) {
-            i = toInteger(arguments[1]);
-        }
-        i = i >= 0 ? i : Math.max(0, length + i);
-        for (; i < length; i++) {
-            if (i in self && self[i] === sought) {
-                return i;
-            }
-        }
-        return -1;
-    };
-}
-if (!Array.prototype.lastIndexOf || ([0, 1].lastIndexOf(0, -3) != -1)) {
-    Array.prototype.lastIndexOf = function lastIndexOf(sought /*, fromIndex */) {
-        var self = splitString && _toString(this) == "[object String]" ?
-                this.split("") :
-                toObject(this),
-            length = self.length >>> 0;
-
-        if (!length) {
-            return -1;
-        }
-        var i = length - 1;
-        if (arguments.length > 1) {
-            i = Math.min(i, toInteger(arguments[1]));
-        }
-        i = i >= 0 ? i : length - Math.abs(i);
-        for (; i >= 0; i--) {
-            if (i in self && sought === self[i]) {
-                return i;
-            }
-        }
-        return -1;
-    };
-}
-if (!Object.getPrototypeOf) {
-    Object.getPrototypeOf = function getPrototypeOf(object) {
-        return object.__proto__ || (
-            object.constructor ?
-            object.constructor.prototype :
-            prototypeOfObject
-        );
-    };
-}
-if (!Object.getOwnPropertyDescriptor) {
-    var ERR_NON_OBJECT = "Object.getOwnPropertyDescriptor called on a " +
-                         "non-object: ";
-    Object.getOwnPropertyDescriptor = function getOwnPropertyDescriptor(object, property) {
-        if ((typeof object != "object" && typeof object != "function") || object === null)
-            throw new TypeError(ERR_NON_OBJECT + object);
-        if (!owns(object, property))
-            return;
-
-        var descriptor, getter, setter;
-        descriptor =  { enumerable: true, configurable: true };
-        if (supportsAccessors) {
-            var prototype = object.__proto__;
-            object.__proto__ = prototypeOfObject;
-
-            var getter = lookupGetter(object, property);
-            var setter = lookupSetter(object, property);
-            object.__proto__ = prototype;
-
-            if (getter || setter) {
-                if (getter) descriptor.get = getter;
-                if (setter) descriptor.set = setter;
-                return descriptor;
-            }
-        }
-        descriptor.value = object[property];
-        return descriptor;
-    };
-}
-if (!Object.getOwnPropertyNames) {
-    Object.getOwnPropertyNames = function getOwnPropertyNames(object) {
-        return Object.keys(object);
-    };
-}
-if (!Object.create) {
-    var createEmpty;
-    if (Object.prototype.__proto__ === null) {
-        createEmpty = function () {
-            return { "__proto__": null };
-        };
-    } else {
-        createEmpty = function () {
-            var empty = {};
-            for (var i in empty)
-                empty[i] = null;
-            empty.constructor =
-            empty.hasOwnProperty =
-            empty.propertyIsEnumerable =
-            empty.isPrototypeOf =
-            empty.toLocaleString =
-            empty.toString =
-            empty.valueOf =
-            empty.__proto__ = null;
-            return empty;
-        }
-    }
-
-    Object.create = function create(prototype, properties) {
-        var object;
-        if (prototype === null) {
-            object = createEmpty();
-        } else {
-            if (typeof prototype != "object")
-                throw new TypeError("typeof prototype["+(typeof prototype)+"] != 'object'");
-            var Type = function () {};
-            Type.prototype = prototype;
-            object = new Type();
-            object.__proto__ = prototype;
-        }
-        if (properties !== void 0)
-            Object.defineProperties(object, properties);
-        return object;
-    };
-}
-
-function doesDefinePropertyWork(object) {
-    try {
-        Object.defineProperty(object, "sentinel", {});
-        return "sentinel" in object;
-    } catch (exception) {
-    }
-}
-if (Object.defineProperty) {
-    var definePropertyWorksOnObject = doesDefinePropertyWork({});
-    var definePropertyWorksOnDom = typeof document == "undefined" ||
-        doesDefinePropertyWork(document.createElement("div"));
-    if (!definePropertyWorksOnObject || !definePropertyWorksOnDom) {
-        var definePropertyFallback = Object.defineProperty;
-    }
-}
-
-if (!Object.defineProperty || definePropertyFallback) {
-    var ERR_NON_OBJECT_DESCRIPTOR = "Property description must be an object: ";
-    var ERR_NON_OBJECT_TARGET = "Object.defineProperty called on non-object: "
-    var ERR_ACCESSORS_NOT_SUPPORTED = "getters & setters can not be defined " +
-                                      "on this javascript engine";
-
-    Object.defineProperty = function defineProperty(object, property, descriptor) {
-        if ((typeof object != "object" && typeof object != "function") || object === null)
-            throw new TypeError(ERR_NON_OBJECT_TARGET + object);
-        if ((typeof descriptor != "object" && typeof descriptor != "function") || descriptor === null)
-            throw new TypeError(ERR_NON_OBJECT_DESCRIPTOR + descriptor);
-        if (definePropertyFallback) {
-            try {
-                return definePropertyFallback.call(Object, object, property, descriptor);
-            } catch (exception) {
-            }
-        }
-        if (owns(descriptor, "value")) {
-
-            if (supportsAccessors && (lookupGetter(object, property) ||
-                                      lookupSetter(object, property)))
-            {
-                var prototype = object.__proto__;
-                object.__proto__ = prototypeOfObject;
-                delete object[property];
-                object[property] = descriptor.value;
-                object.__proto__ = prototype;
-            } else {
-                object[property] = descriptor.value;
-            }
-        } else {
-            if (!supportsAccessors)
-                throw new TypeError(ERR_ACCESSORS_NOT_SUPPORTED);
-            if (owns(descriptor, "get"))
-                defineGetter(object, property, descriptor.get);
-            if (owns(descriptor, "set"))
-                defineSetter(object, property, descriptor.set);
-        }
-
-        return object;
-    };
-}
-if (!Object.defineProperties) {
-    Object.defineProperties = function defineProperties(object, properties) {
-        for (var property in properties) {
-            if (owns(properties, property))
-                Object.defineProperty(object, property, properties[property]);
-        }
-        return object;
-    };
-}
-if (!Object.seal) {
-    Object.seal = function seal(object) {
-        return object;
-    };
-}
-if (!Object.freeze) {
-    Object.freeze = function freeze(object) {
-        return object;
-    };
-}
-try {
-    Object.freeze(function () {});
-} catch (exception) {
-    Object.freeze = (function freeze(freezeObject) {
-        return function freeze(object) {
-            if (typeof object == "function") {
-                return object;
-            } else {
-                return freezeObject(object);
-            }
-        };
-    })(Object.freeze);
-}
-if (!Object.preventExtensions) {
-    Object.preventExtensions = function preventExtensions(object) {
-        return object;
-    };
-}
-if (!Object.isSealed) {
-    Object.isSealed = function isSealed(object) {
-        return false;
-    };
-}
-if (!Object.isFrozen) {
-    Object.isFrozen = function isFrozen(object) {
-        return false;
-    };
-}
-if (!Object.isExtensible) {
-    Object.isExtensible = function isExtensible(object) {
-        if (Object(object) === object) {
-            throw new TypeError(); // TODO message
-        }
-        var name = '';
-        while (owns(object, name)) {
-            name += '?';
-        }
-        object[name] = true;
-        var returnValue = owns(object, name);
-        delete object[name];
-        return returnValue;
-    };
-}
-if (!Object.keys) {
-    var hasDontEnumBug = true,
-        dontEnums = [
-            "toString",
-            "toLocaleString",
-            "valueOf",
-            "hasOwnProperty",
-            "isPrototypeOf",
-            "propertyIsEnumerable",
-            "constructor"
-        ],
-        dontEnumsLength = dontEnums.length;
-
-    for (var key in {"toString": null}) {
-        hasDontEnumBug = false;
-    }
-
-    Object.keys = function keys(object) {
-
-        if (
-            (typeof object != "object" && typeof object != "function") ||
-            object === null
-        ) {
-            throw new TypeError("Object.keys called on a non-object");
-        }
-
-        var keys = [];
-        for (var name in object) {
-            if (owns(object, name)) {
-                keys.push(name);
-            }
-        }
-
-        if (hasDontEnumBug) {
-            for (var i = 0, ii = dontEnumsLength; i < ii; i++) {
-                var dontEnum = dontEnums[i];
-                if (owns(object, dontEnum)) {
-                    keys.push(dontEnum);
-                }
-            }
-        }
-        return keys;
-    };
-
-}
-if (!Date.now) {
-    Date.now = function now() {
-        return new Date().getTime();
-    };
-}
-var ws = "\x09\x0A\x0B\x0C\x0D\x20\xA0\u1680\u180E\u2000\u2001\u2002\u2003" +
-    "\u2004\u2005\u2006\u2007\u2008\u2009\u200A\u202F\u205F\u3000\u2028" +
-    "\u2029\uFEFF";
-if (!String.prototype.trim || ws.trim()) {
-    ws = "[" + ws + "]";
-    var trimBeginRegexp = new RegExp("^" + ws + ws + "*"),
-        trimEndRegexp = new RegExp(ws + ws + "*$");
-    String.prototype.trim = function trim() {
-        return String(this).replace(trimBeginRegexp, "").replace(trimEndRegexp, "");
-    };
-}
-
-function toInteger(n) {
-    n = +n;
-    if (n !== n) { // isNaN
-        n = 0;
-    } else if (n !== 0 && n !== (1/0) && n !== -(1/0)) {
-        n = (n > 0 || -1) * Math.floor(Math.abs(n));
-    }
-    return n;
-}
-
-function isPrimitive(input) {
-    var type = typeof input;
-    return (
-        input === null ||
-        type === "undefined" ||
-        type === "boolean" ||
-        type === "number" ||
-        type === "string"
-    );
-}
-
-function toPrimitive(input) {
-    var val, valueOf, toString;
-    if (isPrimitive(input)) {
-        return input;
-    }
-    valueOf = input.valueOf;
-    if (typeof valueOf === "function") {
-        val = valueOf.call(input);
-        if (isPrimitive(val)) {
-            return val;
-        }
-    }
-    toString = input.toString;
-    if (typeof toString === "function") {
-        val = toString.call(input);
-        if (isPrimitive(val)) {
-            return val;
-        }
-    }
-    throw new TypeError();
-}
-var toObject = function (o) {
-    if (o == null) { // this matches both null and undefined
-        throw new TypeError("can't convert "+o+" to object");
-    }
-    return Object(o);
-};
 
 });
 
@@ -4879,6 +4180,7 @@ exports.setDefaultValues = function(path, optionHash) {
 };
 
 });
+
 ace.define('ace/lib/net', ['require', 'exports', 'module' , 'ace/lib/dom'], function(require, exports, module) {
 
 var dom = require("./dom");
@@ -8049,7 +7351,7 @@ var Tokenizer = function(rules) {
             ruleRegExps.push(adjustedregex);
             if (!rule.onMatch)
                 rule.onMatch = null;
-            rule.__proto__ = null;
+            rule.prototype = null;
         }
         
         splitterRurles.forEach(function(rule) {
@@ -8510,6 +7812,7 @@ var Behaviour = function() {
 
 exports.Behaviour = Behaviour;
 });
+
 ace.define('ace/unicode', ['require', 'exports', 'module' ], function(require, exports, module) {
 exports.packages = {};
 
@@ -10992,6 +10295,7 @@ var Search = function() {
 
 exports.Search = Search;
 });
+
 ace.define('ace/commands/command_manager', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/keyboard/hash_handler', 'ace/lib/event_emitter'], function(require, exports, module) {
 
 
@@ -15712,6 +15016,7 @@ exports.UIWorkerClient = UIWorkerClient;
 exports.WorkerClient = WorkerClient;
 
 });
+
 ace.define('ace/placeholder', ['require', 'exports', 'module' , 'ace/range', 'ace/lib/event_emitter', 'ace/lib/oop'], function(require, exports, module) {
 
 
@@ -16106,46 +15411,58 @@ background: url(\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZ
 var dom = require("../lib/dom");
 dom.importCssString(exports.cssText, exports.cssClass);
 });
-;
-            (function() {
-                ace.require(["ace/ace"], function(a) {
-                    a && a.config.init();
-                    if (!window.ace)
-                        window.ace = {};
-                    for (var key in a) if (a.hasOwnProperty(key))
-                        ace[key] = a[key];
-                });
-            })();
-         
-/* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
- *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * ***** END LICENSE BLOCK ***** */
+
+(function() {
+
+    ace.require(["ace/ace"], function(a) {
+        a && a.config.init();
+        if (!window.ace){
+            window.ace = {};
+        }
+        for (var key in a) {
+            if (a.hasOwnProperty(key)) {
+                ace[key] = a[key];
+            }
+        }
+    });
+
+})();
+
+ace.define("ace/mode/behaviour/xml", ["require", "exports", "module", "ace/lib/oop", "ace/mode/behaviour", "ace/mode/behaviour/cstyle"], function (require, b, c) {
+
+    var oop = require("ace/lib/oop");
+    var Behaviour = require("ace/mode/behaviour").Behaviour;
+    var CstyleBehaviour = require("ace/mode/behaviour/cstyle").CstyleBehaviour;
+    var Mode = function () {
+        this.inherit(CstyleBehaviour, ["string_dquotes"]);
+        this.add("brackets", "insertion", function (a, b, c, d, e) {
+            if (e == "<") {
+                var f = c.getSelectionRange(), g = d.doc.getTextRange(f);
+                return g !== "" ? !1 : {text: "<>", selection: [1, 1]}
+            }
+            var h;
+            if (e == ">") {
+                h = c.getCursorPosition();
+                i = d.doc.getLine(h.row);
+                j = i.substring(h.column, h.column + 1);
+                if (j == ">")return {text: "", selection: [1, 1]}
+            } else if (e == "\n") {
+                h = c.getCursorPosition();
+                i = d.doc.getLine(h.row);
+                k = i.substring(h.column, h.column + 2);
+                if (k == "</") {
+                    var l = this.$getIndent(d.doc.getLine(h.row)) + d.getTabString(), m = this.$getIndent(d.doc.getLine(h.row));
+                    return {text: "\n" + l + "\n" + m, selection: [1, l.length, 1, l.length]}
+                }
+            }
+            return !1
+        })
+    };
+
+    oop.inherits(Mode, Behaviour);
+    b.XmlBehaviour = Mode;
+
+});
 
 ace.define('ace/mode/javascript', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/mode/text', 'ace/tokenizer', 'ace/mode/javascript_highlight_rules', 'ace/mode/matching_brace_outdent', 'ace/range', 'ace/worker/worker_client', 'ace/mode/behaviour/cstyle', 'ace/mode/folding/cstyle'], function(require, exports, module) {
 
@@ -16955,6 +16272,241 @@ oop.inherits(CstyleBehaviour, Behaviour);
 exports.CstyleBehaviour = CstyleBehaviour;
 });
 
+ace.define("ace/mode/css", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text", "ace/tokenizer", "ace/mode/css_highlight_rules", "ace/mode/matching_brace_outdent", "ace/worker/worker_client"], function (a, b, c) {
+    var d = a("ace/lib/oop"), e = a("ace/mode/text").Mode, f = a("ace/tokenizer").Tokenizer, g = a("ace/mode/css_highlight_rules").CssHighlightRules, h = a("ace/mode/matching_brace_outdent").MatchingBraceOutdent, i = a("ace/worker/worker_client").WorkerClient, j = function () {
+        this.$tokenizer = new f((new g).getRules()), this.$outdent = new h
+    };
+    d.inherits(j, e), function () {
+        this.getNextLineIndent = function (a, b, c) {
+            var d = this.$getIndent(b), e = this.$tokenizer.getLineTokens(b, a).tokens;
+            if (e.length && e[e.length - 1].type == "comment")return d;
+            var f = b.match(/^.*\{\s*$/);
+            f && (d += c);
+            return d
+        }, this.checkOutdent = function (a, b, c) {
+            return this.$outdent.checkOutdent(b, c)
+        }, this.autoOutdent = function (a, b, c) {
+            this.$outdent.autoOutdent(b, c)
+        }, this.createWorker = function (a) {
+            var b = a.getDocument(), c = new i(["ace", "pilot"], "worker-css.js", "ace/mode/css_worker", "Worker");
+            c.call("setValue", [b.getValue()]), b.on("change", function (a) {
+                a.range = {start: a.data.range.start, end: a.data.range.end}, c.emit("change", a)
+            }), c.on("csslint", function (b) {
+                var c = [];
+                b.data.forEach(function (a) {
+                    c.push({row: a.line - 1, column: a.col - 1, text: a.message, type: a.type, lint: a})
+                }), a.setAnnotations(c)
+            })
+        }
+    }.call(j.prototype), b.Mode = j
+});
+
+ace.define("ace/mode/css_highlight_rules", ["require", "exports", "module", "ace/lib/oop", "ace/lib/lang", "ace/mode/text_highlight_rules"], function (a, b, c) {
+    var d = a("ace/lib/oop");
+    var e = a("ace/lib/lang");
+    var f = a("ace/mode/text_highlight_rules").TextHighlightRules;
+    var g = function () {
+        function g(a) {
+            var b = [], c = a.split("");
+            for (var d = 0; d < c.length; d++)b.push("[", c[d].toLowerCase(), c[d].toUpperCase(), "]");
+            return b.join("")
+        }
+
+        var a = e.arrayToMap("-moz-box-sizing|-webkit-box-sizing|appearance|azimuth|background-attachment|background-color|background-image|background-position|background-repeat|background|border-bottom-color|border-bottom-style|border-bottom-width|border-bottom|border-collapse|border-color|border-left-color|border-left-style|border-left-width|border-left|border-right-color|border-right-style|border-right-width|border-right|border-spacing|border-style|border-top-color|border-top-style|border-top-width|border-top|border-width|border|bottom|box-sizing|caption-side|clear|clip|color|content|counter-increment|counter-reset|cue-after|cue-before|cue|cursor|direction|display|elevation|empty-cells|float|font-family|font-size-adjust|font-size|font-stretch|font-style|font-variant|font-weight|font|height|left|letter-spacing|line-height|list-style-image|list-style-position|list-style-type|list-style|margin-bottom|margin-left|margin-right|margin-top|marker-offset|margin|marks|max-height|max-width|min-height|min-width|-moz-border-radius|opacity|orphans|outline-color|outline-style|outline-width|outline|overflow|overflow-x|overflow-y|padding-bottom|padding-left|padding-right|padding-top|padding|page-break-after|page-break-before|page-break-inside|page|pause-after|pause-before|pause|pitch-range|pitch|play-during|position|quotes|richness|right|size|speak-header|speak-numeral|speak-punctuation|speech-rate|speak|stress|table-layout|text-align|text-decoration|text-indent|text-shadow|text-transform|top|unicode-bidi|vertical-align|visibility|voice-family|volume|white-space|widows|width|word-spacing|z-index".split("|")), b = e.arrayToMap("rgb|rgba|url|attr|counter|counters".split("|")), c = e.arrayToMap("absolute|all-scroll|always|armenian|auto|baseline|below|bidi-override|block|bold|bolder|border-box|both|bottom|break-all|break-word|capitalize|center|char|circle|cjk-ideographic|col-resize|collapse|content-box|crosshair|dashed|decimal-leading-zero|decimal|default|disabled|disc|distribute-all-lines|distribute-letter|distribute-space|distribute|dotted|double|e-resize|ellipsis|fixed|georgian|groove|hand|hebrew|help|hidden|hiragana-iroha|hiragana|horizontal|ideograph-alpha|ideograph-numeric|ideograph-parenthesis|ideograph-space|inactive|inherit|inline-block|inline|inset|inside|inter-ideograph|inter-word|italic|justify|katakana-iroha|katakana|keep-all|left|lighter|line-edge|line-through|line|list-item|loose|lower-alpha|lower-greek|lower-latin|lower-roman|lowercase|lr-tb|ltr|medium|middle|move|n-resize|ne-resize|newspaper|no-drop|no-repeat|nw-resize|none|normal|not-allowed|nowrap|oblique|outset|outside|overline|pointer|progress|relative|repeat-x|repeat-y|repeat|right|ridge|row-resize|rtl|s-resize|scroll|se-resize|separate|small-caps|solid|square|static|strict|super|sw-resize|table-footer-group|table-header-group|tb-rl|text-bottom|text-top|text|thick|thin|top|transparent|underline|upper-alpha|upper-latin|upper-roman|uppercase|vertical-ideographic|vertical-text|visible|w-resize|wait|whitespace|zero".split("|")), d = e.arrayToMap("aqua|black|blue|fuchsia|gray|green|lime|maroon|navy|olive|orange|purple|red|silver|teal|white|yellow".split("|")), f = "\\-?(?:(?:[0-9]+)|(?:[0-9]*\\.[0-9]+))", h = [{
+            token: "comment",
+            merge: !0,
+            regex: "\\/\\*",
+            next: "ruleset_comment"
+        }, {token: "string", regex: '["](?:(?:\\\\.)|(?:[^"\\\\]))*?["]'}, {
+            token: "string",
+            regex: "['](?:(?:\\\\.)|(?:[^'\\\\]))*?[']"
+        }, {token: "constant.numeric", regex: f + g("em")}, {
+            token: "constant.numeric",
+            regex: f + g("ex")
+        }, {token: "constant.numeric", regex: f + g("px")}, {
+            token: "constant.numeric",
+            regex: f + g("cm")
+        }, {token: "constant.numeric", regex: f + g("mm")}, {
+            token: "constant.numeric",
+            regex: f + g("in")
+        }, {token: "constant.numeric", regex: f + g("pt")}, {
+            token: "constant.numeric",
+            regex: f + g("pc")
+        }, {token: "constant.numeric", regex: f + g("deg")}, {
+            token: "constant.numeric",
+            regex: f + g("rad")
+        }, {token: "constant.numeric", regex: f + g("grad")}, {
+            token: "constant.numeric",
+            regex: f + g("ms")
+        }, {token: "constant.numeric", regex: f + g("s")}, {
+            token: "constant.numeric",
+            regex: f + g("hz")
+        }, {token: "constant.numeric", regex: f + g("khz")}, {
+            token: "constant.numeric",
+            regex: f + "%"
+        }, {token: "constant.numeric", regex: f}, {
+            token: "constant.numeric",
+            regex: "#[a-fA-F0-9]{6}"
+        }, {token: "constant.numeric", regex: "#[a-fA-F0-9]{3}"}, {
+            token: function (e) {
+                return a.hasOwnProperty(e.toLowerCase()) ? "support.type" : b.hasOwnProperty(e.toLowerCase()) ? "support.function" : c.hasOwnProperty(e.toLowerCase()) ? "support.constant" : d.hasOwnProperty(e.toLowerCase()) ? "support.constant.color" : "text"
+            }, regex: "\\-?[a-zA-Z_][a-zA-Z0-9_\\-]*"
+        }], i = e.copyArray(h);
+        i.unshift({token: "rparen", regex: "\\}", next: "start"});
+        var j = e.copyArray(h);
+        j.unshift({token: "rparen", regex: "\\}", next: "media"});
+        var k = [{token: "comment", merge: !0, regex: ".+"}], l = e.copyArray(k);
+        l.unshift({token: "comment", regex: ".*?\\*\\/", next: "start"});
+        var m = e.copyArray(k);
+        m.unshift({token: "comment", regex: ".*?\\*\\/", next: "media"});
+        var n = e.copyArray(k);
+        n.unshift({token: "comment", regex: ".*?\\*\\/", next: "ruleset"}), this.$rules = {
+            start: [{
+                token: "comment",
+                merge: !0,
+                regex: "\\/\\*",
+                next: "comment"
+            }, {token: "lparen", regex: "\\{", next: "ruleset"}, {
+                token: "string",
+                regex: "@media.*?{",
+                next: "media"
+            }, {token: "keyword", regex: "#[a-zA-Z0-9-_]+"}, {
+                token: "variable",
+                regex: "\\.[a-zA-Z0-9-_]+"
+            }, {token: "string", regex: ":[a-zA-Z0-9-_]+"}, {token: "constant", regex: "[a-zA-Z0-9-_]+"}],
+            media: [{token: "comment", merge: !0, regex: "\\/\\*", next: "media_comment"}, {
+                token: "lparen",
+                regex: "\\{",
+                next: "media_ruleset"
+            }, {token: "string", regex: "\\}", next: "start"}, {
+                token: "keyword",
+                regex: "#[a-zA-Z0-9-_]+"
+            }, {token: "variable", regex: "\\.[a-zA-Z0-9-_]+"}, {
+                token: "string",
+                regex: ":[a-zA-Z0-9-_]+"
+            }, {token: "constant", regex: "[a-zA-Z0-9-_]+"}],
+            comment: l,
+            ruleset: i,
+            ruleset_comment: n,
+            media_ruleset: j,
+            media_comment: m
+        }
+    };
+    d.inherits(g, f);
+    b.CssHighlightRules = g;
+});
+
+ace.define("ace/mode/html_highlight_rules", ["require", "exports", "module", "ace/lib/oop", "ace/mode/css_highlight_rules", "ace/mode/javascript_highlight_rules", "ace/mode/text_highlight_rules"], function (a, b, c) {
+    var d = a("ace/lib/oop");
+    var e = a("ace/mode/css_highlight_rules").CssHighlightRules;
+    var f = a("ace/mode/javascript_highlight_rules").JavaScriptHighlightRules;
+    var g = a("ace/mode/text_highlight_rules").TextHighlightRules;
+    var h = function () {
+        function b(a, b) {
+            return [{token: "string", merge: !0, regex: ".*" + a, next: b}, {token: "string", merge: !0, regex: ".+"}]
+        }
+
+        function a(a) {
+            return [{token: "string", regex: '".*?"'}, {
+                token: "string",
+                merge: !0,
+                regex: '["].*$',
+                next: a + "-qqstring"
+            }, {token: "string", regex: "'.*?'"}, {token: "string", merge: !0, regex: "['].*$", next: a + "-qstring"}]
+        }
+
+        this.$rules = {
+            start: [{token: "text", merge: !0, regex: "<\\!\\[CDATA\\[", next: "cdata"}, {
+                token: "xml_pe",
+                regex: "<\\?.*?\\?>"
+            }, {token: "comment", merge: !0, regex: "<\\!--", next: "comment"}, {
+                token: "text",
+                regex: "<(?=s*script)",
+                next: "script"
+            }, {token: "text", regex: "<(?=s*style)", next: "css"}, {
+                token: "text",
+                regex: "<\\/?",
+                next: "tag"
+            }, {token: "text", regex: "\\s+"}, {token: "text", regex: "[^<]+"}],
+            script: [{token: "text", regex: ">", next: "js-start"}, {
+                token: "keyword",
+                regex: "[-_a-zA-Z0-9:]+"
+            }, {token: "text", regex: "\\s+"}].concat(a("script")),
+            css: [{token: "text", regex: ">", next: "css-start"}, {
+                token: "keyword",
+                regex: "[-_a-zA-Z0-9:]+"
+            }, {token: "text", regex: "\\s+"}].concat(a("style")),
+            tag: [{token: "text", regex: ">", next: "start"}, {
+                token: "keyword",
+                regex: "[-_a-zA-Z0-9:]+"
+            }, {token: "text", regex: "\\s+"}].concat(a("tag")),
+            "style-qstring": b("'", "style"),
+            "style-qqstring": b('"', "style"),
+            "script-qstring": b("'", "script"),
+            "script-qqstring": b('"', "script"),
+            "tag-qstring": b("'", "tag"),
+            "tag-qqstring": b('"', "tag"),
+            cdata: [{token: "text", regex: "\\]\\]>", next: "start"}, {
+                token: "text",
+                merge: !0,
+                regex: "\\s+"
+            }, {token: "text", merge: !0, regex: ".+"}],
+            comment: [{token: "comment", regex: ".*?-->", next: "start"}, {token: "comment", merge: !0, regex: ".+"}]
+        }, this.embedRules(f, "js-", [{token: "comment", regex: "\\/\\/.*(?=<\\/script>)", next: "tag"}, {
+            token: "text",
+            regex: "<\\/(?=script)",
+            next: "tag"
+        }]), this.embedRules(e, "css-", [{token: "text", regex: "<\\/(?=style)", next: "tag"}])
+    };
+    d.inherits(h, g);
+    b.HtmlHighlightRules = h;
+});
+
+ace.define("ace/mode/html", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text", "ace/mode/javascript", "ace/mode/css", "ace/tokenizer", "ace/mode/html_highlight_rules", "ace/mode/behaviour/xml"], function (a, b, c) {
+
+    var d = a("../lib/oop");
+    var e = a("./text").Mode;
+    var h = a("../tokenizer").Tokenizer;
+    var f = a("./javascript").Mode;
+    var g = a("./css").Mode;
+    var i = a("./html_highlight_rules").HtmlHighlightRules;
+    //var i = a("./html_highlight_rules").HtmlHighlightRules;
+    //var j = a("../behavious/xml").XmlBehaviour;
+    var j = a("ace/mode/behaviour/xml").XmlBehaviour;
+    //var JavaScriptHighlightRules = require("./javascript_highlight_rules").JavaScriptHighlightRules;
+    //var MatchingBraceOutdent = require("./matching_brace_outdent").MatchingBraceOutdent;
+    //var Range = require("../range").Range;
+    //var WorkerClient = require("../worker/worker_client").WorkerClient;
+    //var CstyleBehaviour = require("./behaviour/cstyle").CstyleBehaviour;
+    //var CStyleFoldMode = require("./folding/cstyle").FoldMode;
+
+
+    var /*d = a("./lib/oop"),
+     e = a("ace/mode/text").Mode,
+     f = a("ace/mode/javascript").Mode,
+     g = a("ace/mode/css").Mode,
+     h = a("ace/tokenizer").Tokenizer,
+     i = a("ace/mode/html_highlight_rules").HtmlHighlightRules,
+     j = a("ace/mode/behaviour/xml").XmlBehaviour,*/
+        k = function () {
+            var a = new i;
+            this.$tokenizer = new h(a.getRules()), this.$behaviour = new j, this.$embeds = a.getEmbeds(), this.createModeDelegates({
+                "js-": f,
+                "css-": g
+            })
+        };
+    d.inherits(k, e), function () {
+        this.toggleCommentLines = function (a, b, c, d) {
+            return 0
+        }, this.getNextLineIndent = function (a, b, c) {
+            return this.$getIndent(b)
+        }, this.checkOutdent = function (a, b, c) {
+            return !1
+        }
+    }.call(k.prototype);
+    b.Mode = k;
+});
+
 ace.define('ace/mode/folding/cstyle', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/range', 'ace/mode/folding/fold_mode'], function(require, exports, module) {
 
 
@@ -17008,36 +16560,6 @@ oop.inherits(FoldMode, BaseFoldMode);
 }).call(FoldMode.prototype);
 
 });
-
-/* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
- *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * ***** END LICENSE BLOCK ***** */
 
 ace.define('ace/theme/monokai', ['require', 'exports', 'module' , 'ace/lib/dom'], function(require, exports, module) {
 
@@ -17150,36 +16672,6 @@ var dom = require("../lib/dom");
 dom.importCssString(exports.cssText, exports.cssClass);
 });
 
-/* ***** BEGIN LICENSE BLOCK *****
- * Distributed under the BSD license:
- *
- * Copyright (c) 2010, Ajax.org B.V.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions are met:
- *     * Redistributions of source code must retain the above copyright
- *       notice, this list of conditions and the following disclaimer.
- *     * Redistributions in binary form must reproduce the above copyright
- *       notice, this list of conditions and the following disclaimer in the
- *       documentation and/or other materials provided with the distribution.
- *     * Neither the name of Ajax.org B.V. nor the
- *       names of its contributors may be used to endorse or promote products
- *       derived from this software without specific prior written permission.
- * 
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
- * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL AJAX.ORG B.V. BE LIABLE FOR ANY
- * DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
- * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
- * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * ***** END LICENSE BLOCK ***** */
-
 ace.define('ace/theme/ace-dawn', ['require', 'exports', 'module' , 'ace/lib/dom'], function(require, exports, module) {
 
 
@@ -17290,7 +16782,6 @@ background: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAACCAYAAACZgb
 var dom = require("../lib/dom");
 dom.importCssString(exports.cssText, exports.cssClass);
 });
-
 
 ace.define("ace/ext/searchbox",["require","exports","module","ace/lib/dom","ace/lib/lang","ace/lib/event","ace/keyboard/hash_handler","ace/lib/keys"], function(require, exports, module) {
 "use strict";
@@ -17695,4 +17186,3 @@ exports.Search = function(editor, isReplace) {
 };
 
 });
-;            
