@@ -109,10 +109,10 @@
 
             this.aceEditor = ace.edit("description");
             this.aceSession = this.aceEditor.getSession();
-            //this.aceSession.setMode('ace/mode/' + (this.isHtml ? 'html' : 'javascript'));
-            this.aceSession.setMode('ace/mode/javascript');
+            this.aceSession.setMode('ace/mode/' + (this.isHtml ? 'html' : 'javascript'));
             this.aceSession.setValue(this.isLegacy ? this.initialEl.value : this.getCodeFromCodeMirror());
             this.aceSession.setFoldStyle('markbeginend');
+
             this.aceSession.on("change", function () {
                 if (!this.isLegacy) {
                     this.setCodeInCodeMirror();
@@ -200,9 +200,9 @@
                 else
                     for (i = 0; i < tab.length; i++)
                         document.getElementById(tab[i]).style.color = "black";
+
             }
 
-            //this.toggleEl.appendChild(document.createTextNode('Screen size'));
             replaceContent(this.toggleEl, 'Screen Size');
             this.toggleEl.id = "screen";
             this.toggleEl.style.cssText = css;
@@ -216,18 +216,16 @@
                 underlineOff("screen");
             }, false);
 
-            //this.slash.appendChild(document.createTextNode('/'));
             replaceContent(this.slash, '/');
             this.slash.id = "slash";
             this.slash.style.cssText = css;
-            this.slash.style.marginRight = ScrollBarWidth + 69 + "px";
+            this.slash.style.marginRight = ScrollBarWidth + 63 + "px";
 
-            //this.toggleEl2.appendChild(document.createTextNode('Color theme'));
-            replaceContent(this.toggleEl2, 'Color Theme');
+            replaceContent(this.toggleEl2, 'Colour Theme');
             this.toggleEl2.id = "theme";
             this.toggleEl2.style.cssText = css;
             this.toggleEl2.style.cursor = "pointer";
-            this.toggleEl2.style.marginRight = ScrollBarWidth + 77 + "px";
+            this.toggleEl2.style.marginRight = ScrollBarWidth + 70 + "px";
 
             this.toggleEl2.addEventListener('mouseover', function(){
                 underlineOn("theme");
@@ -239,7 +237,6 @@
                 underlineOn("theme");
             }, false);
 
-            //this.toggle.appendChild(document.createTextNode('Toggle:'));
             replaceContent(this.toggle, 'Toggle:');
             this.toggle.id = "toggle";
             this.toggle.style.cssText = css;
@@ -386,23 +383,45 @@
             }
         }
 
-        //for (i = 0, i_ = oldEls.length; i < i_; i++){
-        //    els = [].slice.call(document.getElementsByName(oldEls[i]));
-        //    if (els.length > 0){
-        //        initialEl = els[0];
-        //        isLegacy = true;
-        //        break;
-        //    }
-        //}
-        //if (!this.isLegacy){
-        //    for (i = 0, i_ = newEls.length; i < i_; i++){
-        //        els = [].slice.call(document.getElementsByName(newEls[i]));
-        //        if (els.length > 0){
-        //            initialEl = els[0];
-        //            break;
-        //        }
-        //    }
-        //}
+        var theme = 'monokai';
+
+        if (!localStorage.getItem("theme")) {
+            //this.aceEditor.setTheme(dark);
+            //localStorage.setItem("theme", dark);
+        } else {
+            if (localStorage.getItem("theme") === dark){
+                //this.aceEditor.setTheme(dark);
+                //localStorage.setItem("theme", dark);
+            } else {
+                //this.aceEditor.setTheme(bright);
+                //localStorage.setItem("theme", bright);
+                theme = 'default';
+            }
+        }
+
+        // Also style the code preview element.
+        if (theme === 'monokai'){
+            els = [].slice.call(document.querySelectorAll('.cm-s-default'));
+            for (i = 0, i_ = els.length; i < i_; i++){
+                els[i].className = els[i].className.replace('cm-s-default', 'cm-s-monokai');
+            }
+        } else {
+            els = [].slice.call(document.querySelectorAll('.cm-s-monokai'));
+            for (i = 0, i_ = els.length; i < i_; i++){
+                els[i].className = els[i].className.replace('cm-s-monokai', 'cm-s-default');
+            }
+        }
+
+        // GTM has a mouseover effect for each 'step'. When the dark theme is selected,
+        // the background goes white during mouseover. Setting the background-color
+        // to !important fixes this issue.
+        els = [].slice.call(document.querySelectorAll('[class*="cm-s-"]'));
+        for (i = 0, i_ = els.length; i < i_; i++){
+            var style = getComputedStyle(els[i])['backgroundColor'];
+            if (style.indexOf('important') === -1){
+                els[i].setAttribute('style', 'background-color:' + style + '!important');
+            }
+        }
 
         return {
             initialEl: initialEl,
@@ -420,8 +439,6 @@
             data.initialEl.style.display !== 'none' &&
             document.getElementById('maxWidth') === null){
             prettyPrinter = new PrettyPrinter(data);
-            //unsafeWindow.gtmAce = prettyPrinter;
-            //console.log(prettyPrinter);
         }
 
     }

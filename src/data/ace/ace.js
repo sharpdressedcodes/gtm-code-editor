@@ -28,6 +28,8 @@
  *
  * ***** END LICENSE BLOCK ***** */
 
+var window = unsafeWindow;
+
 (function() {
 
 var ACE_NAMESPACE = "ace";
@@ -16462,49 +16464,671 @@ ace.define("ace/mode/html_highlight_rules", ["require", "exports", "module", "ac
     b.HtmlHighlightRules = h;
 });
 
-ace.define("ace/mode/html", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text", "ace/mode/javascript", "ace/mode/css", "ace/tokenizer", "ace/mode/html_highlight_rules", "ace/mode/behaviour/xml"], function (a, b, c) {
+ace.define('ace/mode/html_completions', ['require', 'exports', 'module', 'ace/token_iterator'], function(require, exports, module) {
+    "use strict";
 
-    var d = a("../lib/oop");
-    var e = a("./text").Mode;
-    var h = a("../tokenizer").Tokenizer;
-    var f = a("./javascript").Mode;
-    var g = a("./css").Mode;
-    var i = a("./html_highlight_rules").HtmlHighlightRules;
-    //var i = a("./html_highlight_rules").HtmlHighlightRules;
-    //var j = a("../behavious/xml").XmlBehaviour;
-    var j = a("ace/mode/behaviour/xml").XmlBehaviour;
-    //var JavaScriptHighlightRules = require("./javascript_highlight_rules").JavaScriptHighlightRules;
-    //var MatchingBraceOutdent = require("./matching_brace_outdent").MatchingBraceOutdent;
-    //var Range = require("../range").Range;
-    //var WorkerClient = require("../worker/worker_client").WorkerClient;
-    //var CstyleBehaviour = require("./behaviour/cstyle").CstyleBehaviour;
-    //var CStyleFoldMode = require("./folding/cstyle").FoldMode;
+    var TokenIterator = require("../token_iterator").TokenIterator;
 
+    var commonAttributes = [
+        "accesskey",
+        "class",
+        "contenteditable",
+        "contextmenu",
+        "dir",
+        "draggable",
+        "dropzone",
+        "hidden",
+        "id",
+        "inert",
+        "itemid",
+        "itemprop",
+        "itemref",
+        "itemscope",
+        "itemtype",
+        "lang",
+        "spellcheck",
+        "style",
+        "tabindex",
+        "title",
+        "translate"
+    ];
 
-    var /*d = a("./lib/oop"),
-     e = a("ace/mode/text").Mode,
-     f = a("ace/mode/javascript").Mode,
-     g = a("ace/mode/css").Mode,
-     h = a("ace/tokenizer").Tokenizer,
-     i = a("ace/mode/html_highlight_rules").HtmlHighlightRules,
-     j = a("ace/mode/behaviour/xml").XmlBehaviour,*/
-        k = function () {
-            var a = new i;
-            this.$tokenizer = new h(a.getRules()), this.$behaviour = new j, this.$embeds = a.getEmbeds(), this.createModeDelegates({
-                "js-": f,
-                "css-": g
-            })
-        };
-    d.inherits(k, e), function () {
-        this.toggleCommentLines = function (a, b, c, d) {
-            return 0
-        }, this.getNextLineIndent = function (a, b, c) {
-            return this.$getIndent(b)
-        }, this.checkOutdent = function (a, b, c) {
-            return !1
+    var eventAttributes = [
+        "onabort",
+        "onblur",
+        "oncancel",
+        "oncanplay",
+        "oncanplaythrough",
+        "onchange",
+        "onclick",
+        "onclose",
+        "oncontextmenu",
+        "oncuechange",
+        "ondblclick",
+        "ondrag",
+        "ondragend",
+        "ondragenter",
+        "ondragleave",
+        "ondragover",
+        "ondragstart",
+        "ondrop",
+        "ondurationchange",
+        "onemptied",
+        "onended",
+        "onerror",
+        "onfocus",
+        "oninput",
+        "oninvalid",
+        "onkeydown",
+        "onkeypress",
+        "onkeyup",
+        "onload",
+        "onloadeddata",
+        "onloadedmetadata",
+        "onloadstart",
+        "onmousedown",
+        "onmousemove",
+        "onmouseout",
+        "onmouseover",
+        "onmouseup",
+        "onmousewheel",
+        "onpause",
+        "onplay",
+        "onplaying",
+        "onprogress",
+        "onratechange",
+        "onreset",
+        "onscroll",
+        "onseeked",
+        "onseeking",
+        "onselect",
+        "onshow",
+        "onstalled",
+        "onsubmit",
+        "onsuspend",
+        "ontimeupdate",
+        "onvolumechange",
+        "onwaiting"
+    ];
+
+    var globalAttributes = commonAttributes.concat(eventAttributes);
+
+    var attributeMap = {
+        "html": ["manifest"],
+        "head": [],
+        "title": [],
+        "base": ["href", "target"],
+        "link": ["href", "hreflang", "rel", "media", "type", "sizes"],
+        "meta": ["http-equiv", "name", "content", "charset"],
+        "style": ["type", "media", "scoped"],
+        "script": ["charset", "type", "src", "defer", "async"],
+        "noscript": ["href"],
+        "body": ["onafterprint", "onbeforeprint", "onbeforeunload", "onhashchange", "onmessage", "onoffline", "onpopstate", "onredo", "onresize", "onstorage", "onundo", "onunload"],
+        "section": [],
+        "nav": [],
+        "article": ["pubdate"],
+        "aside": [],
+        "h1": [],
+        "h2": [],
+        "h3": [],
+        "h4": [],
+        "h5": [],
+        "h6": [],
+        "header": [],
+        "footer": [],
+        "address": [],
+        "main": [],
+        "p": [],
+        "hr": [],
+        "pre": [],
+        "blockquote": ["cite"],
+        "ol": ["start", "reversed"],
+        "ul": [],
+        "li": ["value"],
+        "dl": [],
+        "dt": [],
+        "dd": [],
+        "figure": [],
+        "figcaption": [],
+        "div": [],
+        "a": ["href", "target", "ping", "rel", "media", "hreflang", "type"],
+        "em": [],
+        "strong": [],
+        "small": [],
+        "s": [],
+        "cite": [],
+        "q": ["cite"],
+        "dfn": [],
+        "abbr": [],
+        "data": [],
+        "time": ["datetime"],
+        "code": [],
+        "var": [],
+        "samp": [],
+        "kbd": [],
+        "sub": [],
+        "sup": [],
+        "i": [],
+        "b": [],
+        "u": [],
+        "mark": [],
+        "ruby": [],
+        "rt": [],
+        "rp": [],
+        "bdi": [],
+        "bdo": [],
+        "span": [],
+        "br": [],
+        "wbr": [],
+        "ins": ["cite", "datetime"],
+        "del": ["cite", "datetime"],
+        "img": ["alt", "src", "height", "width", "usemap", "ismap"],
+        "iframe": ["name", "src", "height", "width", "sandbox", "seamless"],
+        "embed": ["src", "height", "width", "type"],
+        "object": ["param", "data", "type", "height" , "width", "usemap", "name", "form", "classid"],
+        "param": ["name", "value"],
+        "video": ["src", "autobuffer", "autoplay", "loop", "controls", "width", "height", "poster"],
+        "audio": ["src", "autobuffer", "autoplay", "loop", "controls"],
+        "source": ["src", "type", "media"],
+        "track": ["kind", "src", "srclang", "label", "default"],
+        "canvas": ["width", "height"],
+        "map": ["name"],
+        "area": ["shape", "coords", "href", "hreflang", "alt", "target", "media", "rel", "ping", "type"],
+        "svg": [],
+        "math": [],
+        "table": ["summary"],
+        "caption": [],
+        "colgroup": ["span"],
+        "col": ["span"],
+        "tbody": [],
+        "thead": [],
+        "tfoot": [],
+        "tr": [],
+        "td": ["headers", "rowspan", "colspan"],
+        "th": ["headers", "rowspan", "colspan", "scope"],
+        "form": ["accept-charset", "action", "autocomplete", "enctype", "method", "name", "novalidate", "target"],
+        "fieldset": ["disabled", "form", "name"],
+        "legend": [],
+        "label": ["form", "for"],
+        "input": ["type", "accept", "alt", "autocomplete", "checked", "disabled", "form", "formaction", "formenctype", "formmethod", "formnovalidate", "formtarget", "height", "list", "max", "maxlength", "min", "multiple", "pattern", "placeholder", "readonly", "required", "size", "src", "step", "width", "files", "value"],
+        "button": ["autofocus", "disabled", "form", "formaction", "formenctype", "formmethod", "formnovalidate", "formtarget", "name", "value", "type"],
+        "select": ["autofocus", "disabled", "form", "multiple", "name", "size"],
+        "datalist": [],
+        "optgroup": ["disabled", "label"],
+        "option": ["disabled", "selected", "label", "value"],
+        "textarea": ["autofocus", "disabled", "form", "maxlength", "name", "placeholder", "readonly", "required", "rows", "cols", "wrap"],
+        "keygen": ["autofocus", "challenge", "disabled", "form", "keytype", "name"],
+        "output": ["for", "form", "name"],
+        "progress": ["value", "max"],
+        "meter": ["value", "min", "max", "low", "high", "optimum"],
+        "details": ["open"],
+        "summary": [],
+        "command": ["type", "label", "icon", "disabled", "checked", "radiogroup", "command"],
+        "menu": ["type", "label"],
+        "dialog": ["open"]
+    };
+
+    var elements = Object.keys(attributeMap);
+
+    function is(token, type) {
+        return token.type.lastIndexOf(type + ".xml") > -1;
+    }
+
+    function findTagName(session, pos) {
+        var iterator = new TokenIterator(session, pos.row, pos.column);
+        var token = iterator.getCurrentToken();
+        while (token && !is(token, "tag-name")){
+            token = iterator.stepBackward();
         }
-    }.call(k.prototype);
-    b.Mode = k;
+        if (token)
+            return token.value;
+    }
+
+    var HtmlCompletions = function() {
+
+    };
+
+    (function() {
+
+        this.getCompletions = function(state, session, pos, prefix) {
+            var token = session.getTokenAt(pos.row, pos.column);
+
+            if (!token)
+                return [];
+
+            // tag name
+            if (is(token, "tag-name") || is(token, "tag-open") || is(token, "end-tag-open"))
+                return this.getTagCompletions(state, session, pos, prefix);
+
+            // tag attribute
+            if (is(token, "tag-whitespace") || is(token, "attribute-name"))
+                return this.getAttributeCompetions(state, session, pos, prefix);
+
+            return [];
+        };
+
+        this.getTagCompletions = function(state, session, pos, prefix) {
+            return elements.map(function(element){
+                return {
+                    value: element,
+                    meta: "tag",
+                    score: Number.MAX_VALUE
+                };
+            });
+        };
+
+        this.getAttributeCompetions = function(state, session, pos, prefix) {
+            var tagName = findTagName(session, pos);
+            if (!tagName)
+                return [];
+            var attributes = globalAttributes;
+            if (tagName in attributeMap) {
+                attributes = attributes.concat(attributeMap[tagName]);
+            }
+            return attributes.map(function(attribute){
+                return {
+                    caption: attribute,
+                    snippet: attribute + '="$0"',
+                    meta: "attribute",
+                    score: Number.MAX_VALUE
+                };
+            });
+        };
+
+    }).call(HtmlCompletions.prototype);
+
+    exports.HtmlCompletions = HtmlCompletions;
+});
+
+ace.define('ace/mode/folding/mixed', ['require', 'exports', 'module', 'ace/lib/oop', 'ace/mode/folding/fold_mode'], function(require, exports, module) {
+    "use strict";
+
+    var oop = require("../../lib/oop");
+    var BaseFoldMode = require("./fold_mode").FoldMode;
+
+    var FoldMode = exports.FoldMode = function(defaultMode, subModes) {
+        this.defaultMode = defaultMode;
+        this.subModes = subModes;
+    };
+    oop.inherits(FoldMode, BaseFoldMode);
+
+    (function() {
+
+
+        this.$getMode = function(state) {
+            if (typeof state != "string")
+                state = state[0];
+            for (var key in this.subModes) {
+                if (state.indexOf(key) === 0)
+                    return this.subModes[key];
+            }
+            return null;
+        };
+
+        this.$tryMode = function(state, session, foldStyle, row) {
+            var mode = this.$getMode(state);
+            return (mode ? mode.getFoldWidget(session, foldStyle, row) : "");
+        };
+
+        this.getFoldWidget = function(session, foldStyle, row) {
+            return (
+            this.$tryMode(session.getState(row-1), session, foldStyle, row) ||
+            this.$tryMode(session.getState(row), session, foldStyle, row) ||
+            this.defaultMode.getFoldWidget(session, foldStyle, row)
+            );
+        };
+
+        this.getFoldWidgetRange = function(session, foldStyle, row) {
+            var mode = this.$getMode(session.getState(row-1));
+
+            if (!mode || !mode.getFoldWidget(session, foldStyle, row))
+                mode = this.$getMode(session.getState(row));
+
+            if (!mode || !mode.getFoldWidget(session, foldStyle, row))
+                mode = this.defaultMode;
+
+            return mode.getFoldWidgetRange(session, foldStyle, row);
+        };
+
+    }).call(FoldMode.prototype);
+
+});
+//gk
+ace.define('ace/mode/folding/xml', ["require", "exports", "module", "ace/lib/oop", 'ace/lib/lang', 'ace/range', 'ace/mode/folding/fold_mode', 'ace/token_iterator'], function(require, exports, module) {
+    "use strict";
+
+    var oop = require("../../lib/oop");
+    var lang = require("../../lib/lang");
+    var Range = require("../../range").Range;
+    var BaseFoldMode = require("./fold_mode").FoldMode;
+    var TokenIterator = require("../../token_iterator").TokenIterator;
+
+    var FoldMode = exports.FoldMode = function(voidElements, optionalEndTags) {
+        BaseFoldMode.call(this);
+        this.voidElements = voidElements || {};
+        this.optionalEndTags = oop.mixin({}, this.voidElements);
+        if (optionalEndTags)
+            oop.mixin(this.optionalEndTags, optionalEndTags);
+
+    };
+    oop.inherits(FoldMode, BaseFoldMode);
+
+    var Tag = function() {
+        this.tagName = "";
+        this.closing = false;
+        this.selfClosing = false;
+        this.start = {row: 0, column: 0};
+        this.end = {row: 0, column: 0};
+    };
+
+    function is(token, type) {
+        return token.type.lastIndexOf(type + ".xml") > -1;
+    }
+
+    (function() {
+
+        this.getFoldWidget = function(session, foldStyle, row) {
+            var tag = this._getFirstTagInLine(session, row);
+
+            if (!tag)
+                return "";
+
+            if (tag.closing || (!tag.tagName && tag.selfClosing))
+                return foldStyle == "markbeginend" ? "end" : "";
+
+            if (!tag.tagName || tag.selfClosing || this.voidElements.hasOwnProperty(tag.tagName.toLowerCase()))
+                return "";
+
+            if (this._findEndTagInLine(session, row, tag.tagName, tag.end.column))
+                return "";
+
+            return "start";
+        };
+
+        /*
+         * returns a first tag (or a fragment) in a line
+         */
+        this._getFirstTagInLine = function(session, row) {
+            var tokens = session.getTokens(row);
+            var tag = new Tag();
+
+            for (var i = 0; i < tokens.length; i++) {
+                var token = tokens[i];
+                if (is(token, "tag-open")) {
+                    tag.end.column = tag.start.column + token.value.length;
+                    tag.closing = is(token, "end-tag-open");
+                    token = tokens[++i];
+                    if (!token)
+                        return null;
+                    tag.tagName = token.value;
+                    tag.end.column += token.value.length;
+                    for (i++; i < tokens.length; i++) {
+                        token = tokens[i];
+                        tag.end.column += token.value.length;
+                        if (is(token, "tag-close")) {
+                            tag.selfClosing = token.value == '/>';
+                            break;
+                        }
+                    }
+                    return tag;
+                } else if (is(token, "tag-close")) {
+                    tag.selfClosing = token.value == '/>';
+                    return tag;
+                }
+                tag.start.column += token.value.length;
+            }
+
+            return null;
+        };
+
+        this._findEndTagInLine = function(session, row, tagName, startColumn) {
+            var tokens = session.getTokens(row);
+            var column = 0;
+            for (var i = 0; i < tokens.length; i++) {
+                var token = tokens[i];
+                column += token.value.length;
+                if (column < startColumn)
+                    continue;
+                if (is(token, "end-tag-open")) {
+                    token = tokens[i + 1];
+                    if (token && token.value == tagName)
+                        return true;
+                }
+            }
+            return false;
+        };
+
+        /*
+         * reads a full tag and places the iterator after the tag
+         */
+        this._readTagForward = function(iterator) {
+            var token = iterator.getCurrentToken();
+            if (!token)
+                return null;
+
+            var tag = new Tag();
+            do {
+                if (is(token, "tag-open")) {
+                    tag.closing = is(token, "end-tag-open");
+                    tag.start.row = iterator.getCurrentTokenRow();
+                    tag.start.column = iterator.getCurrentTokenColumn();
+                } else if (is(token, "tag-name")) {
+                    tag.tagName = token.value;
+                } else if (is(token, "tag-close")) {
+                    tag.selfClosing = token.value == "/>";
+                    tag.end.row = iterator.getCurrentTokenRow();
+                    tag.end.column = iterator.getCurrentTokenColumn() + token.value.length;
+                    iterator.stepForward();
+                    return tag;
+                }
+            } while(token = iterator.stepForward());
+
+            return null;
+        };
+
+        this._readTagBackward = function(iterator) {
+            var token = iterator.getCurrentToken();
+            if (!token)
+                return null;
+
+            var tag = new Tag();
+            do {
+                if (is(token, "tag-open")) {
+                    tag.closing = is(token, "end-tag-open");
+                    tag.start.row = iterator.getCurrentTokenRow();
+                    tag.start.column = iterator.getCurrentTokenColumn();
+                    iterator.stepBackward();
+                    return tag;
+                } else if (is(token, "tag-name")) {
+                    tag.tagName = token.value;
+                } else if (is(token, "tag-close")) {
+                    tag.selfClosing = token.value == "/>";
+                    tag.end.row = iterator.getCurrentTokenRow();
+                    tag.end.column = iterator.getCurrentTokenColumn() + token.value.length;
+                }
+            } while(token = iterator.stepBackward());
+
+            return null;
+        };
+
+        this._pop = function(stack, tag) {
+            while (stack.length) {
+
+                var top = stack[stack.length-1];
+                if (!tag || top.tagName == tag.tagName) {
+                    return stack.pop();
+                }
+                else if (this.optionalEndTags.hasOwnProperty(top.tagName)) {
+                    stack.pop();
+                    continue;
+                } else {
+                    return null;
+                }
+            }
+        };
+
+        this.getFoldWidgetRange = function(session, foldStyle, row) {
+            var firstTag = this._getFirstTagInLine(session, row);
+
+            if (!firstTag)
+                return null;
+
+            var isBackward = firstTag.closing || firstTag.selfClosing;
+            var stack = [];
+            var tag;
+
+            if (!isBackward) {
+                var iterator = new TokenIterator(session, row, firstTag.start.column);
+                var start = {
+                    row: row,
+                    column: firstTag.start.column + firstTag.tagName.length + 2
+                };
+                if (firstTag.start.row == firstTag.end.row)
+                    start.column = firstTag.end.column;
+                while (tag = this._readTagForward(iterator)) {
+                    if (tag.selfClosing) {
+                        if (!stack.length) {
+                            tag.start.column += tag.tagName.length + 2;
+                            tag.end.column -= 2;
+                            return Range.fromPoints(tag.start, tag.end);
+                        } else
+                            continue;
+                    }
+
+                    if (tag.closing) {
+                        this._pop(stack, tag);
+                        if (stack.length == 0)
+                            return Range.fromPoints(start, tag.start);
+                    }
+                    else {
+                        stack.push(tag);
+                    }
+                }
+            }
+            else {
+                var iterator = new TokenIterator(session, row, firstTag.end.column);
+                var end = {
+                    row: row,
+                    column: firstTag.start.column
+                };
+
+                while (tag = this._readTagBackward(iterator)) {
+                    if (tag.selfClosing) {
+                        if (!stack.length) {
+                            tag.start.column += tag.tagName.length + 2;
+                            tag.end.column -= 2;
+                            return Range.fromPoints(tag.start, tag.end);
+                        } else
+                            continue;
+                    }
+
+                    if (!tag.closing) {
+                        this._pop(stack, tag);
+                        if (stack.length == 0) {
+                            tag.start.column += tag.tagName.length + 2;
+                            if (tag.start.row == tag.end.row && tag.start.column < tag.end.column)
+                                tag.start.column = tag.end.column;
+                            return Range.fromPoints(tag.start, end);
+                        }
+                    }
+                    else {
+                        stack.push(tag);
+                    }
+                }
+            }
+
+        };
+
+    }).call(FoldMode.prototype);
+
+});
+// gk
+ace.define('ace/mode/folding/html', ["require", "exports", "module", "ace/lib/oop", 'ace/mode/folding/mixed', 'ace/mode/folding/xml', 'ace/mode/folding/cstyle'], function(require, exports, module){
+
+    "use strict";
+
+    var oop = require('../../lib/oop');
+    var MixedFoldMode = require("../../mode/folding/mixed").FoldMode;
+    var XmlFoldMode = require("../../mode/folding/xml").FoldMode;
+    var CStyleFoldMode = require("../../mode/folding/cstyle").FoldMode;
+
+    var FoldMode = exports.FoldMode = function(voidElements, optionalTags) {
+        MixedFoldMode.call(this, new XmlFoldMode(voidElements, optionalTags), {
+            "js-": new CStyleFoldMode(),
+            "css-": new CStyleFoldMode()
+        });
+    };
+
+    oop.inherits(FoldMode, MixedFoldMode);
+
+});
+//gk
+ace.define("ace/mode/html", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text", "ace/mode/javascript", "ace/mode/css", "ace/tokenizer", "ace/mode/html_highlight_rules", "ace/mode/behaviour/xml", 'ace/mode/folding/html', 'ace/mode/html_completions', 'ace/lib/lang'], function (require, exports, module) {
+
+    var oop = require("../lib/oop");
+    var TextMode = require("./text").Mode;
+    var Tokenizer = require("../tokenizer").Tokenizer;
+    var JavaScriptMode = require("./javascript").Mode;
+    var CssMode = require("./css").Mode;
+    var HtmlHighlightRules = require("./html_highlight_rules").HtmlHighlightRules;
+    var XmlBehaviour = require("ace/mode/behaviour/xml").XmlBehaviour;
+    //var HtmlCompletions = require("ace/mode/html_completions").HtmlCompletions;
+    var HtmlFoldMode = require("ace/mode/folding/html").FoldMode;
+    var lang = require('../lib/lang');
+
+    // http://www.w3.org/TR/html5/syntax.html#void-elements
+    var voidElements = ["area", "base", "br", "col", "embed", "hr", "img", "input", "keygen", "link", "meta", "menuitem", "param", "source", "track", "wbr"];
+    var optionalEndTags = ["li", "dt", "dd", "p", "rt", "rp", "optgroup", "option", "colgroup", "td", "th"];
+
+    var Mode = function () {
+        var highlighter = new HtmlHighlightRules;
+        this.$tokenizer = new Tokenizer(highlighter.getRules());
+        this.$behaviour = new XmlBehaviour;
+        this.$embeds = highlighter.getEmbeds();
+
+        //this.$outdent = new MatchingBraceOutdent();
+        //this.$keywordList = highlighter.$keywordList;
+        this.foldingRules = new HtmlFoldMode(voidElements, lang.arrayToMap(optionalEndTags));
+
+        //this.fragmentContext = options && options.fragmentContext;
+        ////this.HighlightRules = HtmlHighlightRules;
+        //this.HighlightRules = new HtmlHighlightRules;
+        //this.$behaviour = new XmlBehaviour();
+        //this.$completer = new HtmlCompletions();
+
+        this.createModeDelegates({
+            "js-": JavaScriptMode,
+            "css-": CssMode
+        });
+
+    };
+
+    oop.inherits(Mode, TextMode);
+
+    (function(){
+
+        this.blockComment = {start: "<!--", end: "-->"};
+
+        this.voidElements = lang.arrayToMap(voidElements);
+
+        this.toggleCommentLines = function (a, b, c, d) {
+            return 0;
+        };
+        this.getNextLineIndent = function (state, line, tab) {
+            return this.$getIndent(line);
+        };
+        this.checkOutdent = function (state, line, input) {
+            return false;
+        };
+
+        //this.getCompletions = function(state, session, pos, prefix) {
+        //    return this.$completer.getCompletions(state, session, pos, prefix);
+        //};
+
+    }).call(Mode.prototype);
+
+    exports.Mode = Mode;
+
 });
 
 ace.define('ace/mode/folding/cstyle', ['require', 'exports', 'module' , 'ace/lib/oop', 'ace/range', 'ace/mode/folding/fold_mode'], function(require, exports, module) {
