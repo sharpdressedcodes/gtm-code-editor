@@ -383,21 +383,8 @@
             }
         }
 
-        var theme = 'monokai';
-
-        if (!localStorage.getItem("theme")) {
-            //this.aceEditor.setTheme(dark);
-            //localStorage.setItem("theme", dark);
-        } else {
-            if (localStorage.getItem("theme") === dark){
-                //this.aceEditor.setTheme(dark);
-                //localStorage.setItem("theme", dark);
-            } else {
-                //this.aceEditor.setTheme(bright);
-                //localStorage.setItem("theme", bright);
-                theme = 'default';
-            }
-        }
+        var item = localStorage.getItem('theme');
+        var theme = item !== null && item !== dark ? 'default' : 'monokai';
 
         // Also style the code preview element.
         if (theme === 'monokai'){

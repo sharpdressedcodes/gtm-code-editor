@@ -29,8 +29,10 @@
  * ***** END LICENSE BLOCK ***** */
 
 var window = unsafeWindow;
+
 function __$(selector, props, content){
-    var element = document.createElement(selector);
+
+    var element = typeof selector === 'string' ? document.createElement(selector) : selector;
 
     if (typeof props !== 'undefined'){
         for (var prop in props){
@@ -40,25 +42,38 @@ function __$(selector, props, content){
         }
     }
 
-    switch (typeof content){
-        case 'string':
-        case 'number':
-        case 'boolean':
-            element.appendChild(document.createTextNode(content));
-            break;
-        case 'object':
-            element.appendChild(typeof content.element !== 'undefined' ? content.element : content);
-            break;
-        case 'function':
-            content(element);
-            break;
-        default:
+    _append(content);
+
+    function _append(content){
+
+        switch (typeof content){
+            case 'string':
+            case 'number':
+            case 'boolean':
+                element.appendChild(document.createTextNode(content));
+                break;
+            case 'object':
+                element.appendChild(typeof content.element !== 'undefined' ? content.element : content);
+                break;
+            case 'function':
+                content(element);
+                break;
+            default:
+        }
+
     }
 
     return Object.create({
         element: element,
         append: function(el){
-            element.appendChild(typeof el.element !== 'undefined' ? el.element : el);
+            _append(el);
+            return this;
+        }.bind(this),
+        clear: function(){
+            while (element.firstChild){
+                element.removeChild(element.firstChild);
+            }
+            return this;
         }.bind(this)
     });
 
@@ -238,9 +253,10 @@ exports.edit = function(el) {
         return el.env.editor;
 
     var doc = exports.createEditSession(dom.getInnerText(el));
-    while (el.firstChild){
-        el.removeChild(el.firstChild);
-    }
+    //while (el.firstChild){
+    //    el.removeChild(el.firstChild);
+    //}
+    __$(el).clear();
 
     var editor = new Editor(new Renderer(el));
     new MultiSelect(editor);
@@ -544,11 +560,9 @@ exports.scrollbarWidth = function(document) {
 
     return noScrollbar-withScrollbar;
 };
-exports.setInnerHtml = function(el, innerHtml) {
-    var element = el.cloneNode(false);//document.createElement("div");
-    element.innerHTML = innerHtml;
-    el.parentNode.replaceChild(element, el);
-    return element;
+exports.setHtml = function(el, html) {
+    var element = __$(el).clear().append(html);
+    return element.element;
 };
 
 if ("textContent" in document.documentElement) {
@@ -12689,10 +12703,8 @@ var Gutter = function(parentEl) {
         }
     };
 
-    //gk
     this.update = function(config) {
         var emptyAnno = {className: ""};
-        //var html = [];
         var i = config.firstRow;
         var lastRow = config.lastRow;
         var fold = this.session.getNextFoldLine(i);
@@ -12703,9 +12715,7 @@ var Gutter = function(parentEl) {
         var firstLineNumber = this.session.$firstLineNumber;
         var lastLineNumber = 0;
 
-        while(this.element.firstChild){
-            this.element.removeChild(this.element.firstChild);
-        }
+        __$(this.element).clear();
 
         while (true) {
             if(i > foldStart) {
@@ -12717,12 +12727,6 @@ var Gutter = function(parentEl) {
                 break;
 
             var annotation = this.$annotations[i] || emptyAnno;
-            //html.push(
-            //    "<div class='ace_gutter-cell ",
-            //    breakpoints[i] || "", decorations[i] || "", annotation.className,
-            //    "' style='height:", this.session.getRowLength(i) * config.lineHeight, "px;'>",
-            //    lastLineNumber = i + firstLineNumber
-            //);
             var bp = breakpoints[i] || '';
             var dec = decorations[i] || '';
 
@@ -12731,25 +12735,14 @@ var Gutter = function(parentEl) {
             var gutter = __$('div', {'class': 'ace_gutter-cell ' + bp + dec + annotation.className, 'style': 'height: ' + (this.session.getRowLength(i) * config.lineHeight) + 'px;'}, lastLineNumber);
             var span = null;
 
-            //this.element.appendChild(__$('div', {'class': 'ace_gutter-cell ' + bp + dec + annotation.className, 'style': 'height: ' + (this.session.getRowLength(i) * config.lineHeight) + 'px;'}, lastLineNumber).element);
-            //this.element.appendChild(__$('div', {'class': 'ace_gutter-cell ' + bp + dec + annotation.className, 'style': 'height: ' + (this.session.getRowLength(i) * config.lineHeight) + 'px;'}, lastLineNumber = i + firstLineNumber).element);
-
             if (foldWidgets) {
                 var c = foldWidgets[i];
                 if (c == null)
                     c = foldWidgets[i] = this.session.getFoldWidget(i);
                 if (c)
-                    //html.push(
-                    //    "<span class='ace_fold-widget ace_", c,
-                    //    c == "start" && i == foldStart && i < fold.end.row ? " ace_closed" : " ace_open",
-                    //    "' style='height:", config.lineHeight, "px",
-                    //    "'></span>"
-                    //);
-                    //this.element.firstChild.appendChild(__$('span', {'class': 'ace_fold-widget ace_' + c + (c == "start" && i == foldStart && i < fold.end.row ? " ace_closed" : " ace_open"), 'style': 'height: ' + config.lineHeight + 'px;'}).element);
                     span = __$('span', {'class': 'ace_fold-widget ace_' + c + (c == "start" && i == foldStart && i < fold.end.row ? " ace_closed" : " ace_open"), 'style': 'height: ' + config.lineHeight + 'px;'});
             }
 
-            //html.push("</div>");
             if (span !== null){
                 gutter.append(span);
             }
@@ -12758,75 +12751,11 @@ var Gutter = function(parentEl) {
             i++;
         }
 
-        //this.element = dom.setInnerHtml(this.element, html.join(""));
         this.element.style.height = config.minHeight + "px";
 
         if (this.session.$useWrapMode)
             lastLineNumber = this.session.getLength();
 
-        var gutterWidth = ("" + lastLineNumber).length * config.characterWidth;
-        var padding = this.$padding || this.$computePadding();
-        gutterWidth += padding.left + padding.right;
-        if (gutterWidth !== this.gutterWidth && !isNaN(gutterWidth)) {
-            this.gutterWidth = gutterWidth;
-            this.element.style.width = Math.ceil(this.gutterWidth) + "px";
-            this._emit("changeGutterWidth", gutterWidth);
-        }
-    };
-    this.updateOLD = function(config) {
-        var emptyAnno = {className: ""};
-        var html = [];
-        var i = config.firstRow;
-        var lastRow = config.lastRow;
-        var fold = this.session.getNextFoldLine(i);
-        var foldStart = fold ? fold.start.row : Infinity;
-        var foldWidgets = this.$showFoldWidgets && this.session.foldWidgets;
-        var breakpoints = this.session.$breakpoints;
-        var decorations = this.session.$decorations;
-        var firstLineNumber = this.session.$firstLineNumber;
-        var lastLineNumber = 0;
-
-        while (true) {
-            if(i > foldStart) {
-                i = fold.end.row + 1;
-                fold = this.session.getNextFoldLine(i, fold);
-                foldStart = fold ?fold.start.row :Infinity;
-            }
-            if(i > lastRow)
-                break;
-
-            var annotation = this.$annotations[i] || emptyAnno;
-            html.push(
-                "<div class='ace_gutter-cell ",
-                breakpoints[i] || "", decorations[i] || "", annotation.className,
-                "' style='height:", this.session.getRowLength(i) * config.lineHeight, "px;'>", 
-                lastLineNumber = i + firstLineNumber
-            );
-
-            if (foldWidgets) {
-                var c = foldWidgets[i];
-                if (c == null)
-                    c = foldWidgets[i] = this.session.getFoldWidget(i);
-                if (c)
-                    html.push(
-                        "<span class='ace_fold-widget ace_", c,
-                        c == "start" && i == foldStart && i < fold.end.row ? " ace_closed" : " ace_open",
-                        "' style='height:", config.lineHeight, "px",
-                        "'></span>"
-                    );
-            }
-
-            html.push("</div>");
-
-            i++;
-        }
-
-        this.element = dom.setInnerHtml(this.element, html.join(""));
-        this.element.style.height = config.minHeight + "px";
-        
-        if (this.session.$useWrapMode)
-            lastLineNumber = this.session.getLength();
-        
         var gutterWidth = ("" + lastLineNumber).length * config.characterWidth;
         var padding = this.$padding || this.$computePadding();
         gutterWidth += padding.left + padding.right;
@@ -12904,8 +12833,6 @@ var Marker = function(parentEl) {
         this.markers = markers;
     };
 
-
-    //gk
     this.update = function(config) {
         var config = config || this.config;
         if (!config)
@@ -12913,10 +12840,7 @@ var Marker = function(parentEl) {
 
         this.config = config;
 
-        //var html = [];
-        while (this.element.firstChild){
-            this.element.removeChild(this.element.firstChild);
-        }
+        __$(this.element).clear();
 
         for (var key in this.markers) {
             var marker = this.markers[key];
@@ -12937,187 +12861,45 @@ var Marker = function(parentEl) {
                 marker.renderer(this.element, range, left, top, config);
                 //marker.renderer(html, range, left, top, config);
             } else if (marker.type == "fullLine") {
-                this.createFullLineMarker(this.element, range, marker.clazz, config);
+                this.drawFullLineMarker(this.element, range, marker.clazz, config);
             } else if (marker.type == "screenLine") {
-                this.createScreenLineMarker(this.element, range, marker.clazz, config);
+                this.drawScreenLineMarker(this.element, range, marker.clazz, config);
             } else if (range.isMultiLine()) {
                 if (marker.type == "text")
-                    this.createTextMarker(this.element, range, marker.clazz, config);
+                    this.drawTextMarker(this.element, range, marker.clazz, config);
                 else
-                    this.createMultiLineMarker(this.element, range, marker.clazz, config);
+                    this.drawMultiLineMarker(this.element, range, marker.clazz, config);
             } else {
-                this.createSingleLineMarker(this.element, range, marker.clazz + " ace_start", config);
+                this.drawSingleLineMarker(this.element, range, marker.clazz + " ace_start", config);
             }
         }
-        //this.element = dom.setInnerHtml(this.element, html.join(""));
-    };
-    this.updateOLD = function(config) {
-        var config = config || this.config;
-        if (!config)
-            return;
-
-        this.config = config;
-
-
-        var html = [];
-        for (var key in this.markers) {
-            var marker = this.markers[key];
-
-            if (!marker.range) {
-                marker.update(html, this, this.session, config);
-                continue;
-            }
-
-            var range = marker.range.clipRows(config.firstRow, config.lastRow);
-            if (range.isEmpty()) continue;
-
-            range = range.toScreenRange(this.session);
-            if (marker.renderer) {
-                var top = this.$getTop(range.start.row, config);
-                var left = this.$padding + range.start.column * config.characterWidth;
-                marker.renderer(html, range, left, top, config);
-            } else if (marker.type == "fullLine") {
-                this.drawFullLineMarker(html, range, marker.clazz, config);
-            } else if (marker.type == "screenLine") {
-                this.drawScreenLineMarker(html, range, marker.clazz, config);
-            } else if (range.isMultiLine()) {
-                if (marker.type == "text")
-                    this.drawTextMarker(html, range, marker.clazz, config);
-                else
-                    this.drawMultiLineMarker(html, range, marker.clazz, config);
-            } else {
-                this.drawSingleLineMarker(html, range, marker.clazz + " ace_start", config);
-            }
-        }
-        this.element = dom.setInnerHtml(this.element, html.join(""));
     };
 
     this.$getTop = function(row, layerConfig) {
         return (row - layerConfig.firstRowScreen) * layerConfig.lineHeight;
     };
-    this.drawTextMarker = function(stringBuilder, range, clazz, layerConfig, extraStyle) {
+
+    this.drawTextMarker = function(htmlBuilder, range, clazz, layerConfig, extraStyle) {
         var row = range.start.row;
 
         var lineRange = new Range(
             row, range.start.column,
             row, this.session.getScreenLastRowColumn(row)
         );
-        this.drawSingleLineMarker(stringBuilder, lineRange, clazz + " ace_start", layerConfig, 1, extraStyle);
+        this.drawSingleLineMarker(htmlBuilder, lineRange, clazz + " ace_start", layerConfig, 1, extraStyle);
         row = range.end.row;
         lineRange = new Range(row, 0, row, range.end.column);
-        this.drawSingleLineMarker(stringBuilder, lineRange, clazz, layerConfig, 0, extraStyle);
+        this.drawSingleLineMarker(htmlBuilder, lineRange, clazz, layerConfig, 0, extraStyle);
 
         for (row = range.start.row + 1; row < range.end.row; row++) {
             lineRange.start.row = row;
             lineRange.end.row = row;
             lineRange.end.column = this.session.getScreenLastRowColumn(row);
-            this.drawSingleLineMarker(stringBuilder, lineRange, clazz, layerConfig, 1, extraStyle);
+            this.drawSingleLineMarker(htmlBuilder, lineRange, clazz, layerConfig, 1, extraStyle);
         }
     };
-    this.drawMultiLineMarker = function(stringBuilder, range, clazz, config, extraStyle) {
-        var padding = this.$padding;
-        var height = config.lineHeight;
-        var top = this.$getTop(range.start.row, config);
-        var left = padding + range.start.column * config.characterWidth;
-        extraStyle = extraStyle || "";
 
-        stringBuilder.push(
-            "<div class='", clazz, " ace_start' style='",
-            "height:", height, "px;",
-            "right:0;",
-            "top:", top, "px;",
-            "left:", left, "px;", extraStyle, "'></div>"
-        );
-        top = this.$getTop(range.end.row, config);
-        var width = range.end.column * config.characterWidth;
-
-        stringBuilder.push(
-            "<div class='", clazz, "' style='",
-            "height:", height, "px;",
-            "width:", width, "px;",
-            "top:", top, "px;",
-            "left:", padding, "px;", extraStyle, "'></div>"
-        );
-        height = (range.end.row - range.start.row - 1) * config.lineHeight;
-        if (height < 0)
-            return;
-        top = this.$getTop(range.start.row + 1, config);
-
-        stringBuilder.push(
-            "<div class='", clazz, "' style='",
-            "height:", height, "px;",
-            "right:0;",
-            "top:", top, "px;",
-            "left:", padding, "px;", extraStyle, "'></div>"
-        );
-    };
-    this.drawSingleLineMarker = function(stringBuilder, range, clazz, config, extraLength, extraStyle) {
-        var height = config.lineHeight;
-        var width = (range.end.column + (extraLength || 0) - range.start.column) * config.characterWidth;
-
-        var top = this.$getTop(range.start.row, config);
-        var left = this.$padding + range.start.column * config.characterWidth;
-
-        stringBuilder.push(
-            "<div class='", clazz, "' style='",
-            "height:", height, "px;",
-            "width:", width, "px;",
-            "top:", top, "px;",
-            "left:", left, "px;", extraStyle || "", "'></div>"
-        );
-    };
-
-    this.drawFullLineMarker = function(stringBuilder, range, clazz, config, extraStyle) {
-        var top = this.$getTop(range.start.row, config);
-        var height = config.lineHeight;
-        if (range.start.row != range.end.row)
-            height += this.$getTop(range.end.row, config) - top;
-
-        stringBuilder.push(
-            "<div class='", clazz, "' style='",
-            "height:", height, "px;",
-            "top:", top, "px;",
-            "left:0;right:0;", extraStyle || "", "'></div>"
-        );
-    };
-    
-    this.drawScreenLineMarker = function(stringBuilder, range, clazz, config, extraStyle) {
-        var top = this.$getTop(range.start.row, config);
-        var height = config.lineHeight;
-
-        stringBuilder.push(
-            "<div class='", clazz, "' style='",
-            "height:", height, "px;",
-            "top:", top, "px;",
-            "left:0;right:0;", extraStyle || "", "'></div>"
-        );
-    };
-
-
-
-
-    //gk
-    this.createTextMarker = function(htmlBuilder, range, clazz, layerConfig, extraStyle) {
-        var row = range.start.row;
-
-        var lineRange = new Range(
-            row, range.start.column,
-            row, this.session.getScreenLastRowColumn(row)
-        );
-        this.createSingleLineMarker(htmlBuilder, lineRange, clazz + " ace_start", layerConfig, 1, extraStyle);
-        row = range.end.row;
-        lineRange = new Range(row, 0, row, range.end.column);
-        this.createSingleLineMarker(htmlBuilder, lineRange, clazz, layerConfig, 0, extraStyle);
-
-        for (row = range.start.row + 1; row < range.end.row; row++) {
-            lineRange.start.row = row;
-            lineRange.end.row = row;
-            lineRange.end.column = this.session.getScreenLastRowColumn(row);
-            this.createSingleLineMarker(htmlBuilder, lineRange, clazz, layerConfig, 1, extraStyle);
-        }
-    };
-    //gk
-    this.createMultiLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
+    this.drawMultiLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
 
         var padding = this.$padding;
         var height = config.lineHeight;
@@ -13128,24 +12910,8 @@ var Marker = function(parentEl) {
         var el = __$('div', {'class': clazz + ' ace_start', 'style': 'height: ' + height + 'px; right: 0; top: ' + top + 'px; left: ' + left + 'px;' + extraStyle});
         htmlBuilder.appendChild(el.element);
 
-        //stringBuilder.push(
-        //    "<div class='", clazz, " ace_start' style='",
-        //    "height:", height, "px;",
-        //    "right:0;",
-        //    "top:", top, "px;",
-        //    "left:", left, "px;", extraStyle, "'></div>"
-        //);
-
         top = this.$getTop(range.end.row, config);
         var width = range.end.column * config.characterWidth;
-
-        //stringBuilder.push(
-        //    "<div class='", clazz, "' style='",
-        //    "height:", height, "px;",
-        //    "width:", width, "px;",
-        //    "top:", top, "px;",
-        //    "left:", padding, "px;", extraStyle, "'></div>"
-        //);
 
         el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; width: ' + width + 'px; top: ' + top + 'px; left: ' + padding + 'px;' + extraStyle});
         htmlBuilder.appendChild(el.element);
@@ -13156,69 +12922,39 @@ var Marker = function(parentEl) {
 
         top = this.$getTop(range.start.row + 1, config);
 
-        //stringBuilder.push(
-        //    "<div class='", clazz, "' style='",
-        //    "height:", height, "px;",
-        //    "right:0;",
-        //    "top:", top, "px;",
-        //    "left:", padding, "px;", extraStyle, "'></div>"
-        //);
-
         el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; right: 0; top: ' + top + 'px; left: ' + padding + 'px;' + extraStyle});
         htmlBuilder.appendChild(el.element);
 
     };
-    //gk
-    this.createSingleLineMarker = function(htmlBuilder, range, clazz, config, extraLength, extraStyle) {
+
+    this.drawSingleLineMarker = function(htmlBuilder, range, clazz, config, extraLength, extraStyle) {
 
         var height = config.lineHeight;
         var width = (range.end.column + (extraLength || 0) - range.start.column) * config.characterWidth;
         var top = this.$getTop(range.start.row, config);
         var left = this.$padding + range.start.column * config.characterWidth;
 
-        //stringBuilder.push(
-        //    "<div class='", clazz, "' style='",
-        //    "height:", height, "px;",
-        //    "width:", width, "px;",
-        //    "top:", top, "px;",
-        //    "left:", left, "px;", extraStyle || "", "'></div>"
-        //);
         var el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; width: ' + width + 'px; top: ' + top + 'px; left: ' + left + 'px;' + (typeof extraStyle !== 'undefined' ? extraStyle : '')});
         htmlBuilder.appendChild(el.element);
         return el;
 
     };
-    //gk
-    this.createFullLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
+
+    this.drawFullLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
         var top = this.$getTop(range.start.row, config);
         var height = config.lineHeight;
         if (range.start.row != range.end.row)
             height += this.$getTop(range.end.row, config) - top;
-
-        //stringBuilder.push(
-        //    "<div class='", clazz, "' style='",
-        //    "height:", height, "px;",
-        //    "top:", top, "px;",
-        //    "left:0;right:0;", extraStyle || "", "'></div>"
-        //);
 
         var el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; top: ' + top + 'px; left: 0; right: 0;' + (typeof extraStyle !== 'undefined' ? extraStyle : '')});
         htmlBuilder.appendChild(el.element);
         return el;
     };
 
-    //gk
-    this.createScreenLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
+    this.drawScreenLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
 
         var top = this.$getTop(range.start.row, config);
         var height = config.lineHeight;
-        //stringBuilder.push(
-        //    "<div class='", clazz, "' style='",
-        //    "height:", height, "px;",
-        //    "top:", top, "px;",
-        //    "left:0;right:0;", extraStyle || "", "'></div>"
-        //);
-
         var el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; top: ' + top + 'px; left: 0; right: 0;' + (typeof extraStyle !== 'undefined' ? extraStyle : '')});
 
         htmlBuilder.appendChild(el.element);
@@ -13416,34 +13152,38 @@ var Text = function(parentEl) {
     this.$tabStrings = [];
     this.onChangeTabSize =
     this.$computeTabString = function() {
+
         var tabSize = this.session.getTabSize();
         this.tabSize = tabSize;
         var tabStr = this.$tabStrings = [0];
+
         for (var i = 1; i < tabSize + 1; i++) {
             if (this.showInvisibles) {
-                tabStr.push("<span class='ace_invisible'>"
-                    + this.TAB_CHAR
-                    + lang.stringRepeat("\xa0", i - 1)
-                    + "</span>");
+                tabStr.push(__$('span', {'class': 'ace_invisible'}, this.TAB_CHAR + lang.stringRepeat("\xa0", i - 1)).element);
             } else {
                 tabStr.push(lang.stringRepeat("\xa0", i));
             }
         }
+
         if (this.displayIndentGuides) {
             this.$indentGuideRe =  /\s\S| \t|\t |\s$/;
             var className = "ace_indent-guide";
+            var spaceContent = null;
+            var tabContent = null;
+
             if (this.showInvisibles) {
                 className += " ace_invisible";
-                var spaceContent = lang.stringRepeat(this.SPACE_CHAR, this.tabSize);
-                var tabContent = this.TAB_CHAR + lang.stringRepeat("\xa0", this.tabSize - 1);
-            } else{
-                var spaceContent = lang.stringRepeat("\xa0", this.tabSize);
-                var tabContent = spaceContent;
+                spaceContent = lang.stringRepeat(this.SPACE_CHAR, this.tabSize);
+                tabContent = this.TAB_CHAR + lang.stringRepeat("\xa0", this.tabSize - 1);
+            } else {
+                spaceContent = lang.stringRepeat("\xa0", this.tabSize);
+                tabContent = spaceContent;
             }
 
-            this.$tabStrings[" "] = "<span class='" + className + "'>" + spaceContent + "</span>";
-            this.$tabStrings["\t"] = "<span class='" + className + "'>" + tabContent + "</span>";
+            this.$tabStrings[" "] = __$('span', {'class': className}, spaceContent).element;
+            this.$tabStrings["\t"] = __$('span', {'class': className}, tabContent).element;
         }
+
     };
 
     this.updateLines = function(config, firstRow, lastRow) {
@@ -13458,9 +13198,11 @@ var Text = function(parentEl) {
 
         var lineElements = this.element.childNodes;
         var lineElementsIdx = 0;
+        var row = null;
+        var foldLine = null;
 
-        for (var row = config.firstRow; row < first; row++) {
-            var foldLine = this.session.getFoldLine(row);
+        for (row = config.firstRow; row < first; row++) {
+            foldLine = this.session.getFoldLine(row);
             if (foldLine) {
                 if (foldLine.containsRow(first)) {
                     first = foldLine.start.row;
@@ -13472,8 +13214,8 @@ var Text = function(parentEl) {
             lineElementsIdx ++;
         }
 
-        var row = first;
-        var foldLine = this.session.getNextFoldLine(row);
+        row = first;
+        foldLine = this.session.getNextFoldLine(row);
         var foldStart = foldLine ? foldLine.start.row : Infinity;
 
         while (true) {
@@ -13487,11 +13229,8 @@ var Text = function(parentEl) {
 
             var lineElement = lineElements[lineElementsIdx++];
             if (lineElement) {
-                var html = [];
-                this.$renderLine(
-                    html, row, !this.$useLineGroups(), row == foldStart ? foldLine : false
-                );
-                dom.setInnerHtml(lineElement, html.join(""));
+                __$(lineElement).clear();
+                this.$renderLine(lineElement, row, !this.$useLineGroups(), row == foldStart ? foldLine : false);
             }
             row++;
         }
@@ -13547,17 +13286,13 @@ var Text = function(parentEl) {
 
             var container = dom.createElement("div");
 
-            var html = [];
-            this.$renderLine(html, row, false, row == foldStart ? foldLine : false);
+            this.$renderLine(container, row, false, row == foldStart ? foldLine : false);
 
-            console.log('ela' + html.join(''));
-
-            container.innerHTML = html.join("");
             if (this.$useLineGroups()) {
                 container.className = 'ace_line_group';
                 fragment.appendChild(container);
             } else {
-                var lines = container.childNodes
+                var lines = container.childNodes;
                 while(lines.length)
                     fragment.appendChild(lines[0]);
             }
@@ -13570,12 +13305,15 @@ var Text = function(parentEl) {
     this.update = function(config) {
         this.config = config;
 
+        var el = null;
         var html = [];
         var firstRow = config.firstRow, lastRow = config.lastRow;
 
         var row = firstRow;
         var foldLine = this.session.getNextFoldLine(row);
         var foldStart = foldLine ? foldLine.start.row : Infinity;
+
+        __$(this.element).clear();
 
         while (true) {
             if (row > foldStart) {
@@ -13586,17 +13324,16 @@ var Text = function(parentEl) {
             if (row > lastRow)
                 break;
 
-            if (this.$useLineGroups())
-                html.push("<div class='ace_line_group'>")
+            el = this.$useLineGroups() ? __$('div', {'class': 'ace_line_group'}).element : this.element;
+            if (this.$useLineGroups()){
+                this.element.appendChild(el);
+            }
 
-            this.$renderLine(html, row, false, row == foldStart ? foldLine : false);
-
-            if (this.$useLineGroups())
-                html.push("</div>"); // end the line group
+            this.$renderLine(el, row, false, row == foldStart ? foldLine : false);
 
             row++;
         }
-        this.element = dom.setInnerHtml(this.element, html.join(""));
+
     };
 
     this.$textToken = {
@@ -13605,38 +13342,40 @@ var Text = function(parentEl) {
         "lparen": true
     };
 
+    this.$renderToken = function(htmlBuilder, screenColumn, token, value) {
 
-    //gk
-    this.$renderToken = function(stringBuilder, screenColumn, token, value) {
         var self = this;
         var replaceReg = /\t|&|<|( +)|([\x00-\x1f\x80-\xa0\u1680\u180E\u2000-\u200f\u2028\u2029\u202F\u205F\u3000\uFEFF])|[\u1100-\u115F\u11A3-\u11A7\u11FA-\u11FF\u2329-\u232A\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u2FF0-\u2FFB\u3000-\u303E\u3041-\u3096\u3099-\u30FF\u3105-\u312D\u3131-\u318E\u3190-\u31BA\u31C0-\u31E3\u31F0-\u321E\u3220-\u3247\u3250-\u32FE\u3300-\u4DBF\u4E00-\uA48C\uA490-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE52\uFE54-\uFE66\uFE68-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6]/g;
+
         var replaceFunc = function(c, a, b, tabIdx, idx4) {
             if (a) {
-                return self.showInvisibles ?
-                "<span class='ace_invisible'>" + lang.stringRepeat(self.SPACE_CHAR, c.length) + "</span>" :
-                    lang.stringRepeat("\xa0", c.length);
+                return self.showInvisibles ? __$('span', {'class': 'ace_invisible'}, lang.stringRepeat(self.SPACE_CHAR, c.length)).element : lang.stringRepeat("\xa0", c.length);
+
             } else if (c == "&") {
-                return "&#38;";
+                //return "&#38;";
+                return '&';
+
             } else if (c == "<") {
-                return "&#60;";
+                //return "&#60;";
+                return '<';
+
             } else if (c == "\t") {
                 var tabSize = self.session.getScreenTabSize(screenColumn + tabIdx);
                 screenColumn += tabSize - 1;
                 return self.$tabStrings[tabSize];
+
             } else if (c == "\u3000") {
                 var classToUse = self.showInvisibles ? "ace_cjk ace_invisible" : "ace_cjk";
                 var space = self.showInvisibles ? self.SPACE_CHAR : "";
                 screenColumn += 1;
-                return "<span class='" + classToUse + "' style='width:" +
-                    (self.config.characterWidth * 2) +
-                    "px'>" + space + "</span>";
+                return __$('span', {'class': classToUse, 'style': 'width: ' + (self.config.characterWidth * 2) + 'px;'}, space).element;
+
             } else if (b) {
-                return "<span class='ace_invisible ace_invalid'>" + self.SPACE_CHAR + "</span>";
+                return __$('span', {'class': 'ace_invisible ace_invalid'}, self.SPACE_CHAR).element;
+
             } else {
                 screenColumn += 1;
-                return "<span class='ace_cjk' style='width:" +
-                    (self.config.characterWidth * 2) +
-                    "px'>" + c + "</span>";
+                return __$('span', {'class': 'ace_cjk', 'style': 'width: ' + (self.config.characterWidth * 2) + 'px;'}, c).element;
             }
         };
 
@@ -13644,66 +13383,66 @@ var Text = function(parentEl) {
 
         if (!this.$textToken[token.type]) {
             var classes = "ace_" + token.type.replace(/\./g, " ace_");
-            var style = "";
-            if (token.type == "fold")
-                style = " style='width:" + (token.value.length * this.config.characterWidth) + "px;' ";
-            stringBuilder.push("<span class='", classes, "'", style, ">", output, "</span>");
-        }
-        else {
-            stringBuilder.push(output);
+            var props = {
+                'class': classes
+            };
+            if (token.type == "fold"){
+                props.style = 'width: ' + (token.value.length * this.config.characterWidth) + 'px;';
+            }
+            htmlBuilder.appendChild(__$('span', props, output).element);
+        } else {
+            __$(htmlBuilder).append(output);
         }
         return screenColumn + value.length;
     };
 
-    this.renderIndentGuide = function(stringBuilder, value) {
+    this.renderIndentGuide = function(htmlBuilder, value) {
+        var i = 0;
         var cols = value.search(this.$indentGuideRe);
         if (cols <= 0)
             return value;
         if (value[0] == " ") {
             cols -= cols % this.tabSize;
-            stringBuilder.push(lang.stringRepeat(this.$tabStrings[" "], cols/this.tabSize));
+            __$(htmlBuilder).append(lang.stringRepeat(this.$tabStrings[" "], cols/this.tabSize));
             return value.substr(cols);
         } else if (value[0] == "\t") {
-            stringBuilder.push(lang.stringRepeat(this.$tabStrings["\t"], cols));
+            __$(htmlBuilder).append(lang.stringRepeat(this.$tabStrings["\t"], cols));
             return value.substr(cols);
         }
         return value;
     };
 
-    this.$renderWrappedLine = function(stringBuilder, tokens, splits, onlyContents) {
+    this.$renderWrappedLine = function(htmlBuilder, tokens, splits, onlyContents) {
         var chars = 0;
         var split = 0;
         var splitChars = splits[0];
         var screenColumn = 0;
+        var el = htmlBuilder;
 
         for (var i = 0; i < tokens.length; i++) {
             var token = tokens[i];
             var value = token.value;
             if (i == 0 && this.displayIndentGuides) {
                 chars = value.length;
-                value = this.renderIndentGuide(stringBuilder, value);
+                value = this.renderIndentGuide(el, value);
                 if (!value)
                     continue;
                 chars -= value.length;
             }
 
             if (chars + value.length < splitChars) {
-                screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
+                screenColumn = this.$renderToken(el, screenColumn, token, value);
                 chars += value.length;
             } else {
                 while (chars + value.length >= splitChars) {
-                    screenColumn = this.$renderToken(
-                        stringBuilder, screenColumn,
-                        token, value.substring(0, splitChars - chars)
-                    );
+                    screenColumn = this.$renderToken(el, screenColumn, token, value.substring(0, splitChars - chars));
                     value = value.substring(splitChars - chars);
                     chars = splitChars;
 
                     if (!onlyContents) {
-                        stringBuilder.push("</div>",
-                            "<div class='ace_line' style='height:",
-                            this.config.lineHeight, "px'>"
-                        );
+                        var el2 = __$('div', {'class': 'ace_line', 'style': 'height: ' + this.config.lineHeight + 'px;'}).element;
+                        el.appendChild(el2);
+                        el = el2;
                     }
 
                     split ++;
@@ -13712,12 +13451,43 @@ var Text = function(parentEl) {
                 }
                 if (value.length != 0) {
                     chars += value.length;
-                    screenColumn = this.$renderToken(
-                        stringBuilder, screenColumn, token, value
-                    );
+                    screenColumn = this.$renderToken(el, screenColumn, token, value);
                 }
             }
         }
+    };
+
+    this.$renderLine = function(htmlBuilder, row, onlyContents, foldLine) {
+
+        if (!foldLine && foldLine != false)
+            foldLine = this.session.getFoldLine(row);
+
+        var tokens = foldLine ? this.$getFoldLineTokens(row, foldLine) : this.session.getTokens(row);
+        var el = htmlBuilder;
+
+        if (!onlyContents) {
+            el = __$('div', {'class': 'ace_line', 'style': 'height: ' + this.config.lineHeight + 'px;'}).element;
+            htmlBuilder.appendChild(el);
+        }
+
+        if (tokens.length) {
+            var splits = this.session.getRowSplitData(row);
+            if (splits && splits.length)
+                this.$renderWrappedLine(el, tokens, splits, onlyContents);
+            else
+                this.$renderSimpleLine(el, tokens);
+        }
+
+        if (this.showInvisibles) {
+            if (foldLine)
+                row = foldLine.end.row;
+
+            var span = document.createElement('span');
+            span.className = 'ace_invisible';
+            span.appendChild(document.createTextNode(row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR));
+            el.appendChild(span);
+        }
+
     };
 
     this.$renderSimpleLine = function(stringBuilder, tokens) {
@@ -13733,388 +13503,6 @@ var Text = function(parentEl) {
             value = token.value;
             screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
         }
-    };
-    this.$renderLine = function(stringBuilder, row, onlyContents, foldLine) {
-        if (!foldLine && foldLine != false)
-            foldLine = this.session.getFoldLine(row);
-
-        if (foldLine)
-            var tokens = this.$getFoldLineTokens(row, foldLine);
-        else
-            var tokens = this.session.getTokens(row);
-
-        var htmlBuilder = null;
-
-        if (!onlyContents) {
-            stringBuilder.push(
-                "<div class='ace_line' style='height:", this.config.lineHeight, "px'>"
-            );
-            htmlBuilder = document.createElement('div');
-            htmlBuilder.className = 'ace_line';
-            htmlBuilder.setAttribute('style', 'height: ' + this.config.lineHeight + 'px;');
-        } else {
-            htmlBuilder = document.createElement('div');
-        }
-
-        //function convertStringToElement(obj){
-        //
-        //    // 0 = either string or <span
-        //    // 1 = opening ' + className
-        //    // 2 = closing '
-        //    // 3 is always ""
-        //    // 4 closing >
-        //    // 5 actual text
-        //    // 6 closing tag
-        //
-        //    var element = null;
-        //
-        //    if (obj.hasOwnProperty(1)){
-        //        var pos = obj[0].indexOf(' ');
-        //        var tag = obj[0].substr(1, pos - 1);
-        //        element = document.createElement(tag);
-        //        element.className = obj[1];
-        //        element.appendChild(document.createTextNode(obj[5]));
-        //    } else {
-        //        element = document.createTextNode(obj[0]);
-        //    }
-        //
-        //    console.log('new element', element);
-        //
-        //    return element;
-        //
-        //}
-
-        //stringBuilder.push = function(){
-        //    //console.log('new data pushed', arguments);
-        //
-        //    var el = convertStringToElement(arguments);
-        //    //stringBuilder.appendChild(el);
-        //    this.appendChild(el);
-        //
-        //    console.log('new data pushed', el, this, stringBuilder, arguments);
-        //
-        //    //function convertStringToElement(obj){
-        //    //
-        //    //    // 0 = either string or <span
-        //    //    // 1 = opening ' + className
-        //    //    // 2 = closing '
-        //    //    // 3 is always ""
-        //    //    // 4 closing >
-        //    //    // 5 actual text
-        //    //    // 6 closing tag
-        //    //
-        //    //    var element = null;
-        //    //
-        //    //   // console.log('typeof=' + typeof obj);
-        //    //
-        //    //    //if (typeof obj[1] !== 'undefined'){
-        //    //    //if (obj.length === 1){
-        //    //    if (obj.hasOwnProperty(1)){
-        //    //        console.log('created element');
-        //    //        var pos = obj[0].indexOf(' ');
-        //    //        var tag = obj[0].substr(1, pos - 1);
-        //    //        element = document.createElement(tag);
-        //    //        element.className = obj[1];
-        //    //        element.appendChild(document.createTextNode(obj[5]));
-        //    //    } else {
-        //    //        console.log('created textndoe');
-        //    //        element = document.createTextNode(obj[0]);
-        //    //    }
-        //    //
-        //    //    return element;
-        //    //
-        //    //}
-        //
-        //}.bind(stringBuilder);
-
-        if (tokens.length) {
-            var splits = this.session.getRowSplitData(row);
-            if (splits && splits.length)
-                this.$renderWrappedLine(stringBuilder, tokens, splits, onlyContents);
-            else
-                this.$renderSimpleLine(stringBuilder, tokens);
-        }
-
-        if (this.showInvisibles) {
-            if (foldLine)
-                row = foldLine.end.row
-
-            stringBuilder.push(
-                "<span class='ace_invisible'>",
-                row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR,
-                "</span>"
-            );
-            var span = document.createElement('span');
-            span.className = 'ace_invisible';
-            span.appendChild(document.createTextNode(row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR));
-            htmlBuilder.appendChild(span);
-        }
-        if (!onlyContents)
-            stringBuilder.push("</div>");
-
-
-
-        //for (var i = 0; i < stringBuilder.length; i++){
-        //    console.log('stringBuilder item[' + i + ']', stringBuilder[i]);
-        //}
-
-
-
-    };
-
-    this.$renderTokenOLD = function(stringBuilder, screenColumn, token, value) {
-        var self = this;
-        var replaceReg = /\t|&|<|( +)|([\x00-\x1f\x80-\xa0\u1680\u180E\u2000-\u200f\u2028\u2029\u202F\u205F\u3000\uFEFF])|[\u1100-\u115F\u11A3-\u11A7\u11FA-\u11FF\u2329-\u232A\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u2FF0-\u2FFB\u3000-\u303E\u3041-\u3096\u3099-\u30FF\u3105-\u312D\u3131-\u318E\u3190-\u31BA\u31C0-\u31E3\u31F0-\u321E\u3220-\u3247\u3250-\u32FE\u3300-\u4DBF\u4E00-\uA48C\uA490-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE52\uFE54-\uFE66\uFE68-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6]/g;
-        var replaceFunc = function(c, a, b, tabIdx, idx4) {
-            if (a) {
-                return self.showInvisibles ?
-                    "<span class='ace_invisible'>" + lang.stringRepeat(self.SPACE_CHAR, c.length) + "</span>" :
-                    lang.stringRepeat("\xa0", c.length);
-            } else if (c == "&") {
-                return "&#38;";
-            } else if (c == "<") {
-                return "&#60;";
-            } else if (c == "\t") {
-                var tabSize = self.session.getScreenTabSize(screenColumn + tabIdx);
-                screenColumn += tabSize - 1;
-                return self.$tabStrings[tabSize];
-            } else if (c == "\u3000") {
-                var classToUse = self.showInvisibles ? "ace_cjk ace_invisible" : "ace_cjk";
-                var space = self.showInvisibles ? self.SPACE_CHAR : "";
-                screenColumn += 1;
-                return "<span class='" + classToUse + "' style='width:" +
-                    (self.config.characterWidth * 2) +
-                    "px'>" + space + "</span>";
-            } else if (b) {
-                return "<span class='ace_invisible ace_invalid'>" + self.SPACE_CHAR + "</span>";
-            } else {
-                screenColumn += 1;
-                return "<span class='ace_cjk' style='width:" +
-                    (self.config.characterWidth * 2) +
-                    "px'>" + c + "</span>";
-            }
-        };
-
-        var output = value.replace(replaceReg, replaceFunc);
-
-        if (!this.$textToken[token.type]) {
-            var classes = "ace_" + token.type.replace(/\./g, " ace_");
-            var style = "";
-            if (token.type == "fold")
-                style = " style='width:" + (token.value.length * this.config.characterWidth) + "px;' ";
-            stringBuilder.push("<span class='", classes, "'", style, ">", output, "</span>");
-        }
-        else {
-            stringBuilder.push(output);
-        }
-        return screenColumn + value.length;
-    };
-
-    this.renderIndentGuideOLD = function(stringBuilder, value) {
-        var cols = value.search(this.$indentGuideRe);
-        if (cols <= 0)
-            return value;
-        if (value[0] == " ") {
-            cols -= cols % this.tabSize;
-            stringBuilder.push(lang.stringRepeat(this.$tabStrings[" "], cols/this.tabSize));
-            return value.substr(cols);
-        } else if (value[0] == "\t") {
-            stringBuilder.push(lang.stringRepeat(this.$tabStrings["\t"], cols));
-            return value.substr(cols);
-        }
-        return value;
-    };
-
-    this.$renderWrappedLineOLD = function(stringBuilder, tokens, splits, onlyContents) {
-        var chars = 0;
-        var split = 0;
-        var splitChars = splits[0];
-        var screenColumn = 0;
-
-        for (var i = 0; i < tokens.length; i++) {
-            var token = tokens[i];
-            var value = token.value;
-            if (i == 0 && this.displayIndentGuides) {
-                chars = value.length;
-                value = this.renderIndentGuide(stringBuilder, value);
-                if (!value)
-                    continue;
-                chars -= value.length;
-            }
-
-            if (chars + value.length < splitChars) {
-                screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
-                chars += value.length;
-            } else {
-                while (chars + value.length >= splitChars) {
-                    screenColumn = this.$renderToken(
-                        stringBuilder, screenColumn,
-                        token, value.substring(0, splitChars - chars)
-                    );
-                    value = value.substring(splitChars - chars);
-                    chars = splitChars;
-
-                    if (!onlyContents) {
-                        stringBuilder.push("</div>",
-                            "<div class='ace_line' style='height:",
-                            this.config.lineHeight, "px'>"
-                        );
-                    }
-
-                    split ++;
-                    screenColumn = 0;
-                    splitChars = splits[split] || Number.MAX_VALUE;
-                }
-                if (value.length != 0) {
-                    chars += value.length;
-                    screenColumn = this.$renderToken(
-                        stringBuilder, screenColumn, token, value
-                    );
-                }
-            }
-        }
-    };
-
-    this.$renderSimpleLineOLD = function(stringBuilder, tokens) {
-        var screenColumn = 0;
-        var token = tokens[0];
-        var value = token.value;
-        if (this.displayIndentGuides)
-            value = this.renderIndentGuide(stringBuilder, value);
-        if (value)
-            screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
-        for (var i = 1; i < tokens.length; i++) {
-            token = tokens[i];
-            value = token.value;
-            screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
-        }
-    };
-    this.$renderLineOLD = function(stringBuilder, row, onlyContents, foldLine) {
-        if (!foldLine && foldLine != false)
-            foldLine = this.session.getFoldLine(row);
-
-        if (foldLine)
-            var tokens = this.$getFoldLineTokens(row, foldLine);
-        else
-            var tokens = this.session.getTokens(row);
-
-        var htmlBuilder = null;
-
-        if (!onlyContents) {
-            stringBuilder.push(
-                "<div class='ace_line' style='height:", this.config.lineHeight, "px'>"
-            );
-            htmlBuilder = document.createElement('div');
-            htmlBuilder.className = 'ace_line';
-            htmlBuilder.setAttribute('style', 'height: ' + this.config.lineHeight + 'px;');
-        } else {
-            htmlBuilder = document.createElement('div');
-        }
-
-        //function convertStringToElement(obj){
-        //
-        //    // 0 = either string or <span
-        //    // 1 = opening ' + className
-        //    // 2 = closing '
-        //    // 3 is always ""
-        //    // 4 closing >
-        //    // 5 actual text
-        //    // 6 closing tag
-        //
-        //    var element = null;
-        //
-        //    if (obj.hasOwnProperty(1)){
-        //        var pos = obj[0].indexOf(' ');
-        //        var tag = obj[0].substr(1, pos - 1);
-        //        element = document.createElement(tag);
-        //        element.className = obj[1];
-        //        element.appendChild(document.createTextNode(obj[5]));
-        //    } else {
-        //        element = document.createTextNode(obj[0]);
-        //    }
-        //
-        //    console.log('new element', element);
-        //
-        //    return element;
-        //
-        //}
-
-        //stringBuilder.push = function(){
-        //    //console.log('new data pushed', arguments);
-        //
-        //    var el = convertStringToElement(arguments);
-        //    //stringBuilder.appendChild(el);
-        //    this.appendChild(el);
-        //
-        //    console.log('new data pushed', el, this, stringBuilder, arguments);
-        //
-        //    //function convertStringToElement(obj){
-        //    //
-        //    //    // 0 = either string or <span
-        //    //    // 1 = opening ' + className
-        //    //    // 2 = closing '
-        //    //    // 3 is always ""
-        //    //    // 4 closing >
-        //    //    // 5 actual text
-        //    //    // 6 closing tag
-        //    //
-        //    //    var element = null;
-        //    //
-        //    //   // console.log('typeof=' + typeof obj);
-        //    //
-        //    //    //if (typeof obj[1] !== 'undefined'){
-        //    //    //if (obj.length === 1){
-        //    //    if (obj.hasOwnProperty(1)){
-        //    //        console.log('created element');
-        //    //        var pos = obj[0].indexOf(' ');
-        //    //        var tag = obj[0].substr(1, pos - 1);
-        //    //        element = document.createElement(tag);
-        //    //        element.className = obj[1];
-        //    //        element.appendChild(document.createTextNode(obj[5]));
-        //    //    } else {
-        //    //        console.log('created textndoe');
-        //    //        element = document.createTextNode(obj[0]);
-        //    //    }
-        //    //
-        //    //    return element;
-        //    //
-        //    //}
-        //
-        //}.bind(stringBuilder);
-
-        if (tokens.length) {
-            var splits = this.session.getRowSplitData(row);
-            if (splits && splits.length)
-                this.$renderWrappedLine(stringBuilder, tokens, splits, onlyContents);
-            else
-                this.$renderSimpleLine(stringBuilder, tokens);
-        }
-
-        if (this.showInvisibles) {
-            if (foldLine)
-                row = foldLine.end.row
-
-            stringBuilder.push(
-                "<span class='ace_invisible'>",
-                row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR,
-                "</span>"
-            );
-            var span = document.createElement('span');
-            span.className = 'ace_invisible';
-            span.appendChild(document.createTextNode(row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR));
-            htmlBuilder.appendChild(span);
-        }
-        if (!onlyContents)
-            stringBuilder.push("</div>");
-
-
-
-        for (var i = 0; i < stringBuilder.length; i++){
-            console.log('stringBuilder item[' + i + ']', stringBuilder[i]);
-        }
-
-
-
     };
 
     this.$getFoldLineTokens = function(row, foldLine) {
@@ -17454,7 +16842,7 @@ ace.define('ace/mode/folding/mixed', ['require', 'exports', 'module', 'ace/lib/o
     }).call(FoldMode.prototype);
 
 });
-//gk
+
 ace.define('ace/mode/folding/xml', ["require", "exports", "module", "ace/lib/oop", 'ace/lib/lang', 'ace/range', 'ace/mode/folding/fold_mode', 'ace/token_iterator'], function(require, exports, module) {
     "use strict";
 
@@ -17703,7 +17091,7 @@ ace.define('ace/mode/folding/xml', ["require", "exports", "module", "ace/lib/oop
     }).call(FoldMode.prototype);
 
 });
-// gk
+
 ace.define('ace/mode/folding/html', ["require", "exports", "module", "ace/lib/oop", 'ace/mode/folding/mixed', 'ace/mode/folding/xml', 'ace/mode/folding/cstyle'], function(require, exports, module){
 
     "use strict";
@@ -17723,7 +17111,7 @@ ace.define('ace/mode/folding/html', ["require", "exports", "module", "ace/lib/oo
     oop.inherits(FoldMode, MixedFoldMode);
 
 });
-//gk
+
 ace.define("ace/mode/html", ["require", "exports", "module", "ace/lib/oop", "ace/mode/text", "ace/mode/javascript", "ace/mode/css", "ace/tokenizer", "ace/mode/html_highlight_rules", "ace/mode/behaviour/xml", 'ace/mode/folding/html', 'ace/mode/html_completions', 'ace/lib/lang'], function (require, exports, module) {
 
     var oop = require("../lib/oop");
@@ -18269,9 +17657,8 @@ div1.append(replaceForm);
 div1.append(optionsForm);
 
 var SearchBox = function(editor, range, showReplaceForm) {
-        var div = dom.createElement("div");
-        //div.innerHTML = html;
-        div.appendChild(div1.element);
+    var div = dom.createElement("div");
+    div.appendChild(div1.element);
     this.element = div.firstChild;
 
     this.$init();
