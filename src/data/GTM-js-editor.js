@@ -415,12 +415,10 @@
         // GTM has a mouseover effect for each 'step'. When the dark theme is selected,
         // the background goes white during mouseover. Setting the background-color
         // to !important fixes this issue.
+        var colour = (theme === 'monokai' ? '272822' : 'ffffff');
         els = [].slice.call(document.querySelectorAll('[class*="cm-s-"]'));
         for (i = 0, i_ = els.length; i < i_; i++){
-            var style = getComputedStyle(els[i])['backgroundColor'];
-            if (style.indexOf('important') === -1){
-                els[i].setAttribute('style', 'background-color:' + style + '!important');
-            }
+            els[i].setAttribute('style', 'background-color: #' + colour + '!important');
         }
 
         return {

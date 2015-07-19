@@ -29,6 +29,40 @@
  * ***** END LICENSE BLOCK ***** */
 
 var window = unsafeWindow;
+function __$(selector, props, content){
+    var element = document.createElement(selector);
+
+    if (typeof props !== 'undefined'){
+        for (var prop in props){
+            if (props.hasOwnProperty(prop)){
+                element.setAttribute(prop, props[prop]);
+            }
+        }
+    }
+
+    switch (typeof content){
+        case 'string':
+        case 'number':
+        case 'boolean':
+            element.appendChild(document.createTextNode(content));
+            break;
+        case 'object':
+            element.appendChild(typeof content.element !== 'undefined' ? content.element : content);
+            break;
+        case 'function':
+            content(element);
+            break;
+        default:
+    }
+
+    return Object.create({
+        element: element,
+        append: function(el){
+            element.appendChild(typeof el.element !== 'undefined' ? el.element : el);
+        }.bind(this)
+    });
+
+}
 
 (function() {
 
@@ -3701,7 +3735,11 @@ function GutterHandler(mouseHandler) {
         tooltipAnnotation = annotation.text.join("<br/>");
 
         tooltip.style.display = "block";
-        tooltip.innerHTML = tooltipAnnotation;
+        if (tooltip.firstChild){
+            tooltip.replaceChild(document.createTextNode(tooltipAnnotation), tooltip.firstChild)
+        } else {
+            tooltip.appendChild(document.createTextNode(tooltipAnnotation));
+        }
         editor.on("mousewheel", hideTooltip);
 
         moveTooltip(mouseEvent);
@@ -12651,7 +12689,91 @@ var Gutter = function(parentEl) {
         }
     };
 
+    //gk
     this.update = function(config) {
+        var emptyAnno = {className: ""};
+        //var html = [];
+        var i = config.firstRow;
+        var lastRow = config.lastRow;
+        var fold = this.session.getNextFoldLine(i);
+        var foldStart = fold ? fold.start.row : Infinity;
+        var foldWidgets = this.$showFoldWidgets && this.session.foldWidgets;
+        var breakpoints = this.session.$breakpoints;
+        var decorations = this.session.$decorations;
+        var firstLineNumber = this.session.$firstLineNumber;
+        var lastLineNumber = 0;
+
+        while(this.element.firstChild){
+            this.element.removeChild(this.element.firstChild);
+        }
+
+        while (true) {
+            if(i > foldStart) {
+                i = fold.end.row + 1;
+                fold = this.session.getNextFoldLine(i, fold);
+                foldStart = fold ?fold.start.row :Infinity;
+            }
+            if(i > lastRow)
+                break;
+
+            var annotation = this.$annotations[i] || emptyAnno;
+            //html.push(
+            //    "<div class='ace_gutter-cell ",
+            //    breakpoints[i] || "", decorations[i] || "", annotation.className,
+            //    "' style='height:", this.session.getRowLength(i) * config.lineHeight, "px;'>",
+            //    lastLineNumber = i + firstLineNumber
+            //);
+            var bp = breakpoints[i] || '';
+            var dec = decorations[i] || '';
+
+            lastLineNumber = i + firstLineNumber;
+
+            var gutter = __$('div', {'class': 'ace_gutter-cell ' + bp + dec + annotation.className, 'style': 'height: ' + (this.session.getRowLength(i) * config.lineHeight) + 'px;'}, lastLineNumber);
+            var span = null;
+
+            //this.element.appendChild(__$('div', {'class': 'ace_gutter-cell ' + bp + dec + annotation.className, 'style': 'height: ' + (this.session.getRowLength(i) * config.lineHeight) + 'px;'}, lastLineNumber).element);
+            //this.element.appendChild(__$('div', {'class': 'ace_gutter-cell ' + bp + dec + annotation.className, 'style': 'height: ' + (this.session.getRowLength(i) * config.lineHeight) + 'px;'}, lastLineNumber = i + firstLineNumber).element);
+
+            if (foldWidgets) {
+                var c = foldWidgets[i];
+                if (c == null)
+                    c = foldWidgets[i] = this.session.getFoldWidget(i);
+                if (c)
+                    //html.push(
+                    //    "<span class='ace_fold-widget ace_", c,
+                    //    c == "start" && i == foldStart && i < fold.end.row ? " ace_closed" : " ace_open",
+                    //    "' style='height:", config.lineHeight, "px",
+                    //    "'></span>"
+                    //);
+                    //this.element.firstChild.appendChild(__$('span', {'class': 'ace_fold-widget ace_' + c + (c == "start" && i == foldStart && i < fold.end.row ? " ace_closed" : " ace_open"), 'style': 'height: ' + config.lineHeight + 'px;'}).element);
+                    span = __$('span', {'class': 'ace_fold-widget ace_' + c + (c == "start" && i == foldStart && i < fold.end.row ? " ace_closed" : " ace_open"), 'style': 'height: ' + config.lineHeight + 'px;'});
+            }
+
+            //html.push("</div>");
+            if (span !== null){
+                gutter.append(span);
+            }
+            this.element.appendChild(gutter.element);
+
+            i++;
+        }
+
+        //this.element = dom.setInnerHtml(this.element, html.join(""));
+        this.element.style.height = config.minHeight + "px";
+
+        if (this.session.$useWrapMode)
+            lastLineNumber = this.session.getLength();
+
+        var gutterWidth = ("" + lastLineNumber).length * config.characterWidth;
+        var padding = this.$padding || this.$computePadding();
+        gutterWidth += padding.left + padding.right;
+        if (gutterWidth !== this.gutterWidth && !isNaN(gutterWidth)) {
+            this.gutterWidth = gutterWidth;
+            this.element.style.width = Math.ceil(this.gutterWidth) + "px";
+            this._emit("changeGutterWidth", gutterWidth);
+        }
+    };
+    this.updateOLD = function(config) {
         var emptyAnno = {className: ""};
         var html = [];
         var i = config.firstRow;
@@ -12782,7 +12904,54 @@ var Marker = function(parentEl) {
         this.markers = markers;
     };
 
+
+    //gk
     this.update = function(config) {
+        var config = config || this.config;
+        if (!config)
+            return;
+
+        this.config = config;
+
+        //var html = [];
+        while (this.element.firstChild){
+            this.element.removeChild(this.element.firstChild);
+        }
+
+        for (var key in this.markers) {
+            var marker = this.markers[key];
+
+            if (!marker.range) {
+                marker.update(this.element, this, this.session, config);
+                //marker.update(html, this, this.session, config);
+                continue;
+            }
+
+            var range = marker.range.clipRows(config.firstRow, config.lastRow);
+            if (range.isEmpty()) continue;
+
+            range = range.toScreenRange(this.session);
+            if (marker.renderer) {
+                var top = this.$getTop(range.start.row, config);
+                var left = this.$padding + range.start.column * config.characterWidth;
+                marker.renderer(this.element, range, left, top, config);
+                //marker.renderer(html, range, left, top, config);
+            } else if (marker.type == "fullLine") {
+                this.createFullLineMarker(this.element, range, marker.clazz, config);
+            } else if (marker.type == "screenLine") {
+                this.createScreenLineMarker(this.element, range, marker.clazz, config);
+            } else if (range.isMultiLine()) {
+                if (marker.type == "text")
+                    this.createTextMarker(this.element, range, marker.clazz, config);
+                else
+                    this.createMultiLineMarker(this.element, range, marker.clazz, config);
+            } else {
+                this.createSingleLineMarker(this.element, range, marker.clazz + " ace_start", config);
+            }
+        }
+        //this.element = dom.setInnerHtml(this.element, html.join(""));
+    };
+    this.updateOLD = function(config) {
         var config = config || this.config;
         if (!config)
             return;
@@ -12924,6 +13093,140 @@ var Marker = function(parentEl) {
         );
     };
 
+
+
+
+    //gk
+    this.createTextMarker = function(htmlBuilder, range, clazz, layerConfig, extraStyle) {
+        var row = range.start.row;
+
+        var lineRange = new Range(
+            row, range.start.column,
+            row, this.session.getScreenLastRowColumn(row)
+        );
+        this.createSingleLineMarker(htmlBuilder, lineRange, clazz + " ace_start", layerConfig, 1, extraStyle);
+        row = range.end.row;
+        lineRange = new Range(row, 0, row, range.end.column);
+        this.createSingleLineMarker(htmlBuilder, lineRange, clazz, layerConfig, 0, extraStyle);
+
+        for (row = range.start.row + 1; row < range.end.row; row++) {
+            lineRange.start.row = row;
+            lineRange.end.row = row;
+            lineRange.end.column = this.session.getScreenLastRowColumn(row);
+            this.createSingleLineMarker(htmlBuilder, lineRange, clazz, layerConfig, 1, extraStyle);
+        }
+    };
+    //gk
+    this.createMultiLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
+
+        var padding = this.$padding;
+        var height = config.lineHeight;
+        var top = this.$getTop(range.start.row, config);
+        var left = padding + range.start.column * config.characterWidth;
+        extraStyle = extraStyle || "";
+
+        var el = __$('div', {'class': clazz + ' ace_start', 'style': 'height: ' + height + 'px; right: 0; top: ' + top + 'px; left: ' + left + 'px;' + extraStyle});
+        htmlBuilder.appendChild(el.element);
+
+        //stringBuilder.push(
+        //    "<div class='", clazz, " ace_start' style='",
+        //    "height:", height, "px;",
+        //    "right:0;",
+        //    "top:", top, "px;",
+        //    "left:", left, "px;", extraStyle, "'></div>"
+        //);
+
+        top = this.$getTop(range.end.row, config);
+        var width = range.end.column * config.characterWidth;
+
+        //stringBuilder.push(
+        //    "<div class='", clazz, "' style='",
+        //    "height:", height, "px;",
+        //    "width:", width, "px;",
+        //    "top:", top, "px;",
+        //    "left:", padding, "px;", extraStyle, "'></div>"
+        //);
+
+        el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; width: ' + width + 'px; top: ' + top + 'px; left: ' + padding + 'px;' + extraStyle});
+        htmlBuilder.appendChild(el.element);
+
+        height = (range.end.row - range.start.row - 1) * config.lineHeight;
+        if (height < 0)
+            return;
+
+        top = this.$getTop(range.start.row + 1, config);
+
+        //stringBuilder.push(
+        //    "<div class='", clazz, "' style='",
+        //    "height:", height, "px;",
+        //    "right:0;",
+        //    "top:", top, "px;",
+        //    "left:", padding, "px;", extraStyle, "'></div>"
+        //);
+
+        el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; right: 0; top: ' + top + 'px; left: ' + padding + 'px;' + extraStyle});
+        htmlBuilder.appendChild(el.element);
+
+    };
+    //gk
+    this.createSingleLineMarker = function(htmlBuilder, range, clazz, config, extraLength, extraStyle) {
+
+        var height = config.lineHeight;
+        var width = (range.end.column + (extraLength || 0) - range.start.column) * config.characterWidth;
+        var top = this.$getTop(range.start.row, config);
+        var left = this.$padding + range.start.column * config.characterWidth;
+
+        //stringBuilder.push(
+        //    "<div class='", clazz, "' style='",
+        //    "height:", height, "px;",
+        //    "width:", width, "px;",
+        //    "top:", top, "px;",
+        //    "left:", left, "px;", extraStyle || "", "'></div>"
+        //);
+        var el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; width: ' + width + 'px; top: ' + top + 'px; left: ' + left + 'px;' + (typeof extraStyle !== 'undefined' ? extraStyle : '')});
+        htmlBuilder.appendChild(el.element);
+        return el;
+
+    };
+    //gk
+    this.createFullLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
+        var top = this.$getTop(range.start.row, config);
+        var height = config.lineHeight;
+        if (range.start.row != range.end.row)
+            height += this.$getTop(range.end.row, config) - top;
+
+        //stringBuilder.push(
+        //    "<div class='", clazz, "' style='",
+        //    "height:", height, "px;",
+        //    "top:", top, "px;",
+        //    "left:0;right:0;", extraStyle || "", "'></div>"
+        //);
+
+        var el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; top: ' + top + 'px; left: 0; right: 0;' + (typeof extraStyle !== 'undefined' ? extraStyle : '')});
+        htmlBuilder.appendChild(el.element);
+        return el;
+    };
+
+    //gk
+    this.createScreenLineMarker = function(htmlBuilder, range, clazz, config, extraStyle) {
+
+        var top = this.$getTop(range.start.row, config);
+        var height = config.lineHeight;
+        //stringBuilder.push(
+        //    "<div class='", clazz, "' style='",
+        //    "height:", height, "px;",
+        //    "top:", top, "px;",
+        //    "left:0;right:0;", extraStyle || "", "'></div>"
+        //);
+
+        var el = __$('div', {'class': clazz, 'style': 'height: ' + height + 'px; top: ' + top + 'px; left: 0; right: 0;' + (typeof extraStyle !== 'undefined' ? extraStyle : '')});
+
+        htmlBuilder.appendChild(el.element);
+
+        return el;
+
+    };
+
 }).call(Marker.prototype);
 
 exports.Marker = Marker;
@@ -13012,7 +13315,11 @@ var Text = function(parentEl) {
             style.position = "fixed";
             style.overflow = "visible";
             style.whiteSpace = "nowrap";
-            measureNode.innerHTML = lang.stringRepeat("Xy", n);
+            if (measureNode.firstChild){
+                measureNode.replaceChild(document.createTextNode(lang.stringRepeat("Xy", n)), measureNode.firstChild)
+            } else {
+                measureNode.appendChild(document.createTextNode(lang.stringRepeat("Xy", n)));
+            }
 
             if (this.element.ownerDocument.body) {
                 this.element.ownerDocument.body.appendChild(measureNode);
@@ -13053,7 +13360,11 @@ var Text = function(parentEl) {
             style.overflow = "visible";
             style.whiteSpace = "nowrap";
 
-            measureNode.innerHTML = "X";
+            if (measureNode.firstChild){
+                measureNode.replaceChild(document.createTextNode("X"), measureNode.firstChild)
+            } else {
+                measureNode.appendChild(document.createTextNode("X"));
+            }
 
             var container = this.element.parentNode;
             while (container && !dom.hasCssClass(container, "ace_editor"))
@@ -13238,6 +13549,9 @@ var Text = function(parentEl) {
 
             var html = [];
             this.$renderLine(html, row, false, row == foldStart ? foldLine : false);
+
+            console.log('ela' + html.join(''));
+
             container.innerHTML = html.join("");
             if (this.$useLineGroups()) {
                 container.className = 'ace_line_group';
@@ -13291,13 +13605,15 @@ var Text = function(parentEl) {
         "lparen": true
     };
 
+
+    //gk
     this.$renderToken = function(stringBuilder, screenColumn, token, value) {
         var self = this;
         var replaceReg = /\t|&|<|( +)|([\x00-\x1f\x80-\xa0\u1680\u180E\u2000-\u200f\u2028\u2029\u202F\u205F\u3000\uFEFF])|[\u1100-\u115F\u11A3-\u11A7\u11FA-\u11FF\u2329-\u232A\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u2FF0-\u2FFB\u3000-\u303E\u3041-\u3096\u3099-\u30FF\u3105-\u312D\u3131-\u318E\u3190-\u31BA\u31C0-\u31E3\u31F0-\u321E\u3220-\u3247\u3250-\u32FE\u3300-\u4DBF\u4E00-\uA48C\uA490-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE52\uFE54-\uFE66\uFE68-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6]/g;
         var replaceFunc = function(c, a, b, tabIdx, idx4) {
             if (a) {
                 return self.showInvisibles ?
-                    "<span class='ace_invisible'>" + lang.stringRepeat(self.SPACE_CHAR, c.length) + "</span>" :
+                "<span class='ace_invisible'>" + lang.stringRepeat(self.SPACE_CHAR, c.length) + "</span>" :
                     lang.stringRepeat("\xa0", c.length);
             } else if (c == "&") {
                 return "&#38;";
@@ -13427,12 +13743,89 @@ var Text = function(parentEl) {
         else
             var tokens = this.session.getTokens(row);
 
+        var htmlBuilder = null;
 
         if (!onlyContents) {
             stringBuilder.push(
                 "<div class='ace_line' style='height:", this.config.lineHeight, "px'>"
             );
+            htmlBuilder = document.createElement('div');
+            htmlBuilder.className = 'ace_line';
+            htmlBuilder.setAttribute('style', 'height: ' + this.config.lineHeight + 'px;');
+        } else {
+            htmlBuilder = document.createElement('div');
         }
+
+        //function convertStringToElement(obj){
+        //
+        //    // 0 = either string or <span
+        //    // 1 = opening ' + className
+        //    // 2 = closing '
+        //    // 3 is always ""
+        //    // 4 closing >
+        //    // 5 actual text
+        //    // 6 closing tag
+        //
+        //    var element = null;
+        //
+        //    if (obj.hasOwnProperty(1)){
+        //        var pos = obj[0].indexOf(' ');
+        //        var tag = obj[0].substr(1, pos - 1);
+        //        element = document.createElement(tag);
+        //        element.className = obj[1];
+        //        element.appendChild(document.createTextNode(obj[5]));
+        //    } else {
+        //        element = document.createTextNode(obj[0]);
+        //    }
+        //
+        //    console.log('new element', element);
+        //
+        //    return element;
+        //
+        //}
+
+        //stringBuilder.push = function(){
+        //    //console.log('new data pushed', arguments);
+        //
+        //    var el = convertStringToElement(arguments);
+        //    //stringBuilder.appendChild(el);
+        //    this.appendChild(el);
+        //
+        //    console.log('new data pushed', el, this, stringBuilder, arguments);
+        //
+        //    //function convertStringToElement(obj){
+        //    //
+        //    //    // 0 = either string or <span
+        //    //    // 1 = opening ' + className
+        //    //    // 2 = closing '
+        //    //    // 3 is always ""
+        //    //    // 4 closing >
+        //    //    // 5 actual text
+        //    //    // 6 closing tag
+        //    //
+        //    //    var element = null;
+        //    //
+        //    //   // console.log('typeof=' + typeof obj);
+        //    //
+        //    //    //if (typeof obj[1] !== 'undefined'){
+        //    //    //if (obj.length === 1){
+        //    //    if (obj.hasOwnProperty(1)){
+        //    //        console.log('created element');
+        //    //        var pos = obj[0].indexOf(' ');
+        //    //        var tag = obj[0].substr(1, pos - 1);
+        //    //        element = document.createElement(tag);
+        //    //        element.className = obj[1];
+        //    //        element.appendChild(document.createTextNode(obj[5]));
+        //    //    } else {
+        //    //        console.log('created textndoe');
+        //    //        element = document.createTextNode(obj[0]);
+        //    //    }
+        //    //
+        //    //    return element;
+        //    //
+        //    //}
+        //
+        //}.bind(stringBuilder);
 
         if (tokens.length) {
             var splits = this.session.getRowSplitData(row);
@@ -13451,9 +13844,277 @@ var Text = function(parentEl) {
                 row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR,
                 "</span>"
             );
+            var span = document.createElement('span');
+            span.className = 'ace_invisible';
+            span.appendChild(document.createTextNode(row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR));
+            htmlBuilder.appendChild(span);
         }
         if (!onlyContents)
             stringBuilder.push("</div>");
+
+
+
+        //for (var i = 0; i < stringBuilder.length; i++){
+        //    console.log('stringBuilder item[' + i + ']', stringBuilder[i]);
+        //}
+
+
+
+    };
+
+    this.$renderTokenOLD = function(stringBuilder, screenColumn, token, value) {
+        var self = this;
+        var replaceReg = /\t|&|<|( +)|([\x00-\x1f\x80-\xa0\u1680\u180E\u2000-\u200f\u2028\u2029\u202F\u205F\u3000\uFEFF])|[\u1100-\u115F\u11A3-\u11A7\u11FA-\u11FF\u2329-\u232A\u2E80-\u2E99\u2E9B-\u2EF3\u2F00-\u2FD5\u2FF0-\u2FFB\u3000-\u303E\u3041-\u3096\u3099-\u30FF\u3105-\u312D\u3131-\u318E\u3190-\u31BA\u31C0-\u31E3\u31F0-\u321E\u3220-\u3247\u3250-\u32FE\u3300-\u4DBF\u4E00-\uA48C\uA490-\uA4C6\uA960-\uA97C\uAC00-\uD7A3\uD7B0-\uD7C6\uD7CB-\uD7FB\uF900-\uFAFF\uFE10-\uFE19\uFE30-\uFE52\uFE54-\uFE66\uFE68-\uFE6B\uFF01-\uFF60\uFFE0-\uFFE6]/g;
+        var replaceFunc = function(c, a, b, tabIdx, idx4) {
+            if (a) {
+                return self.showInvisibles ?
+                    "<span class='ace_invisible'>" + lang.stringRepeat(self.SPACE_CHAR, c.length) + "</span>" :
+                    lang.stringRepeat("\xa0", c.length);
+            } else if (c == "&") {
+                return "&#38;";
+            } else if (c == "<") {
+                return "&#60;";
+            } else if (c == "\t") {
+                var tabSize = self.session.getScreenTabSize(screenColumn + tabIdx);
+                screenColumn += tabSize - 1;
+                return self.$tabStrings[tabSize];
+            } else if (c == "\u3000") {
+                var classToUse = self.showInvisibles ? "ace_cjk ace_invisible" : "ace_cjk";
+                var space = self.showInvisibles ? self.SPACE_CHAR : "";
+                screenColumn += 1;
+                return "<span class='" + classToUse + "' style='width:" +
+                    (self.config.characterWidth * 2) +
+                    "px'>" + space + "</span>";
+            } else if (b) {
+                return "<span class='ace_invisible ace_invalid'>" + self.SPACE_CHAR + "</span>";
+            } else {
+                screenColumn += 1;
+                return "<span class='ace_cjk' style='width:" +
+                    (self.config.characterWidth * 2) +
+                    "px'>" + c + "</span>";
+            }
+        };
+
+        var output = value.replace(replaceReg, replaceFunc);
+
+        if (!this.$textToken[token.type]) {
+            var classes = "ace_" + token.type.replace(/\./g, " ace_");
+            var style = "";
+            if (token.type == "fold")
+                style = " style='width:" + (token.value.length * this.config.characterWidth) + "px;' ";
+            stringBuilder.push("<span class='", classes, "'", style, ">", output, "</span>");
+        }
+        else {
+            stringBuilder.push(output);
+        }
+        return screenColumn + value.length;
+    };
+
+    this.renderIndentGuideOLD = function(stringBuilder, value) {
+        var cols = value.search(this.$indentGuideRe);
+        if (cols <= 0)
+            return value;
+        if (value[0] == " ") {
+            cols -= cols % this.tabSize;
+            stringBuilder.push(lang.stringRepeat(this.$tabStrings[" "], cols/this.tabSize));
+            return value.substr(cols);
+        } else if (value[0] == "\t") {
+            stringBuilder.push(lang.stringRepeat(this.$tabStrings["\t"], cols));
+            return value.substr(cols);
+        }
+        return value;
+    };
+
+    this.$renderWrappedLineOLD = function(stringBuilder, tokens, splits, onlyContents) {
+        var chars = 0;
+        var split = 0;
+        var splitChars = splits[0];
+        var screenColumn = 0;
+
+        for (var i = 0; i < tokens.length; i++) {
+            var token = tokens[i];
+            var value = token.value;
+            if (i == 0 && this.displayIndentGuides) {
+                chars = value.length;
+                value = this.renderIndentGuide(stringBuilder, value);
+                if (!value)
+                    continue;
+                chars -= value.length;
+            }
+
+            if (chars + value.length < splitChars) {
+                screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
+                chars += value.length;
+            } else {
+                while (chars + value.length >= splitChars) {
+                    screenColumn = this.$renderToken(
+                        stringBuilder, screenColumn,
+                        token, value.substring(0, splitChars - chars)
+                    );
+                    value = value.substring(splitChars - chars);
+                    chars = splitChars;
+
+                    if (!onlyContents) {
+                        stringBuilder.push("</div>",
+                            "<div class='ace_line' style='height:",
+                            this.config.lineHeight, "px'>"
+                        );
+                    }
+
+                    split ++;
+                    screenColumn = 0;
+                    splitChars = splits[split] || Number.MAX_VALUE;
+                }
+                if (value.length != 0) {
+                    chars += value.length;
+                    screenColumn = this.$renderToken(
+                        stringBuilder, screenColumn, token, value
+                    );
+                }
+            }
+        }
+    };
+
+    this.$renderSimpleLineOLD = function(stringBuilder, tokens) {
+        var screenColumn = 0;
+        var token = tokens[0];
+        var value = token.value;
+        if (this.displayIndentGuides)
+            value = this.renderIndentGuide(stringBuilder, value);
+        if (value)
+            screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
+        for (var i = 1; i < tokens.length; i++) {
+            token = tokens[i];
+            value = token.value;
+            screenColumn = this.$renderToken(stringBuilder, screenColumn, token, value);
+        }
+    };
+    this.$renderLineOLD = function(stringBuilder, row, onlyContents, foldLine) {
+        if (!foldLine && foldLine != false)
+            foldLine = this.session.getFoldLine(row);
+
+        if (foldLine)
+            var tokens = this.$getFoldLineTokens(row, foldLine);
+        else
+            var tokens = this.session.getTokens(row);
+
+        var htmlBuilder = null;
+
+        if (!onlyContents) {
+            stringBuilder.push(
+                "<div class='ace_line' style='height:", this.config.lineHeight, "px'>"
+            );
+            htmlBuilder = document.createElement('div');
+            htmlBuilder.className = 'ace_line';
+            htmlBuilder.setAttribute('style', 'height: ' + this.config.lineHeight + 'px;');
+        } else {
+            htmlBuilder = document.createElement('div');
+        }
+
+        //function convertStringToElement(obj){
+        //
+        //    // 0 = either string or <span
+        //    // 1 = opening ' + className
+        //    // 2 = closing '
+        //    // 3 is always ""
+        //    // 4 closing >
+        //    // 5 actual text
+        //    // 6 closing tag
+        //
+        //    var element = null;
+        //
+        //    if (obj.hasOwnProperty(1)){
+        //        var pos = obj[0].indexOf(' ');
+        //        var tag = obj[0].substr(1, pos - 1);
+        //        element = document.createElement(tag);
+        //        element.className = obj[1];
+        //        element.appendChild(document.createTextNode(obj[5]));
+        //    } else {
+        //        element = document.createTextNode(obj[0]);
+        //    }
+        //
+        //    console.log('new element', element);
+        //
+        //    return element;
+        //
+        //}
+
+        //stringBuilder.push = function(){
+        //    //console.log('new data pushed', arguments);
+        //
+        //    var el = convertStringToElement(arguments);
+        //    //stringBuilder.appendChild(el);
+        //    this.appendChild(el);
+        //
+        //    console.log('new data pushed', el, this, stringBuilder, arguments);
+        //
+        //    //function convertStringToElement(obj){
+        //    //
+        //    //    // 0 = either string or <span
+        //    //    // 1 = opening ' + className
+        //    //    // 2 = closing '
+        //    //    // 3 is always ""
+        //    //    // 4 closing >
+        //    //    // 5 actual text
+        //    //    // 6 closing tag
+        //    //
+        //    //    var element = null;
+        //    //
+        //    //   // console.log('typeof=' + typeof obj);
+        //    //
+        //    //    //if (typeof obj[1] !== 'undefined'){
+        //    //    //if (obj.length === 1){
+        //    //    if (obj.hasOwnProperty(1)){
+        //    //        console.log('created element');
+        //    //        var pos = obj[0].indexOf(' ');
+        //    //        var tag = obj[0].substr(1, pos - 1);
+        //    //        element = document.createElement(tag);
+        //    //        element.className = obj[1];
+        //    //        element.appendChild(document.createTextNode(obj[5]));
+        //    //    } else {
+        //    //        console.log('created textndoe');
+        //    //        element = document.createTextNode(obj[0]);
+        //    //    }
+        //    //
+        //    //    return element;
+        //    //
+        //    //}
+        //
+        //}.bind(stringBuilder);
+
+        if (tokens.length) {
+            var splits = this.session.getRowSplitData(row);
+            if (splits && splits.length)
+                this.$renderWrappedLine(stringBuilder, tokens, splits, onlyContents);
+            else
+                this.$renderSimpleLine(stringBuilder, tokens);
+        }
+
+        if (this.showInvisibles) {
+            if (foldLine)
+                row = foldLine.end.row
+
+            stringBuilder.push(
+                "<span class='ace_invisible'>",
+                row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR,
+                "</span>"
+            );
+            var span = document.createElement('span');
+            span.className = 'ace_invisible';
+            span.appendChild(document.createTextNode(row == this.session.getLength() - 1 ? this.EOF_CHAR : this.EOL_CHAR));
+            htmlBuilder.appendChild(span);
+        }
+        if (!onlyContents)
+            stringBuilder.push("</div>");
+
+
+
+        for (var i = 0; i < stringBuilder.length; i++){
+            console.log('stringBuilder item[' + i + ']', stringBuilder[i]);
+        }
+
+
+
     };
 
     this.$getFoldLineTokens = function(row, foldLine) {
@@ -15582,7 +16243,7 @@ var JavaScriptHighlightRules = function() {
             "const|yield|import|get|set|" +
             "break|case|catch|continue|default|delete|do|else|finally|for|function|" +
             "if|in|instanceof|new|return|switch|throw|try|typeof|let|var|while|with|debugger|" +
-            "__parent__|__count__|escape|unescape|with|__proto__|" +
+            "__parent__|__count__|escape|unescape|with|\x5f\x5fproto\x5f\x5f|" +
             "class|enum|extends|super|export|implements|private|public|interface|package|protected|static",
         "storage.type":
             "const|let|var|function",
@@ -17572,28 +18233,45 @@ var keyUtil = require("../lib/keys");
 
 dom.importCssString(searchboxCss, "ace_searchbox");
 
-var html = '<div class="ace_search right">\
-    <button type="button" action="hide" class="ace_searchbtn_close"></button>\
-    <div class="ace_search_form">\
-        <input class="ace_search_field" placeholder="Search for" spellcheck="false"></input>\
-        <button type="button" action="findNext" class="ace_searchbtn next"></button>\
-        <button type="button" action="findPrev" class="ace_searchbtn prev"></button>\
-    </div>\
-    <div class="ace_replace_form">\
-        <input class="ace_search_field" placeholder="Replace with" spellcheck="false"></input>\
-        <button type="button" action="replaceAndFindNext" class="ace_replacebtn">Replace</button>\
-        <button type="button" action="replaceAll" class="ace_replacebtn">All</button>\
-    </div>\
-    <div class="ace_search_options">\
-        <span action="toggleRegexpMode" class="ace_button" title="RegExp Search">.*</span>\
-        <span action="toggleCaseSensitive" class="ace_button" title="CaseSensitive Search">Aa</span>\
-        <span action="toggleWholeWords" class="ace_button" title="Whole Word Search">\\b</span>\
-    </div>\
-</div>'.replace(/>\s+/g, ">");
+var div1 = __$('div', {'class': 'ace_search right'});
+var button1 = __$('button', {'class': 'ace_searchbtn_close', 'type': 'button', 'action': 'hide'});
+var searchForm = __$('div', {'class': 'ace_search_form'});
+var replaceForm = __$('div', {'class': 'ace_replace_form'});
+var optionsForm = __$('div', {'class': 'ace_search_options'});
+
+var input1 = __$('input', {'class': 'ace_search_field', 'placeholder': 'Search for', 'spellcheck': 'false'});
+var button2 = __$('button', {'class': 'ace_searchbtn next', 'type': 'button', 'action': 'findNext'});
+var button3 = __$('button', {'class': 'ace_searchbtn prev', 'type': 'button', 'action': 'findPrev'});
+
+var input2 = __$('input', {'class': 'ace_search_field', 'placeholder': 'Replace with', 'spellcheck': 'false'});
+var button4 = __$('button', {'class': 'ace_replacebtn', 'type': 'button', 'action': 'replaceAndFindNext'}, 'Replace');
+var button5 = __$('button', {'class': 'ace_replacebtn', 'type': 'button', 'action': 'replaceAll'}, 'All');
+
+var span1 = __$('span', {'class': 'ace_button', 'title': 'RegExp Search', 'action': 'toggleRegexpMode'}, '.*');
+var span2 = __$('span', {'class': 'ace_button', 'title': 'CaseSensitive Search', 'action': 'toggleCaseSensitive'}, 'Aa');
+var span3 = __$('span', {'class': 'ace_button', 'title': 'Whole Word Search', 'action': 'toggleWholeWords'}, '\\b');
+
+searchForm.append(input1);
+searchForm.append(button2);
+searchForm.append(button3);
+
+replaceForm.append(input2);
+replaceForm.append(button4);
+replaceForm.append(button5);
+
+optionsForm.append(span1);
+optionsForm.append(span2);
+optionsForm.append(span3);
+
+div1.append(button1);
+div1.append(searchForm);
+div1.append(replaceForm);
+div1.append(optionsForm);
 
 var SearchBox = function(editor, range, showReplaceForm) {
-    var div = dom.createElement("div");
-    div.innerHTML = html;
+        var div = dom.createElement("div");
+        //div.innerHTML = html;
+        div.appendChild(div1.element);
     this.element = div.firstChild;
 
     this.$init();
