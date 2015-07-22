@@ -13398,15 +13398,20 @@ var Text = function(parentEl) {
 
     this.renderIndentGuide = function(htmlBuilder, value) {
         var i = 0;
+        var i_ = 0;
         var cols = value.search(this.$indentGuideRe);
         if (cols <= 0)
             return value;
         if (value[0] == " ") {
             cols -= cols % this.tabSize;
-            __$(htmlBuilder).append(lang.stringRepeat(this.$tabStrings[" "], cols/this.tabSize));
+            for (i = 0, i_ = cols / this.tabSize; i < i_; i++){
+                __$(htmlBuilder).append(this.$tabStrings[value[0]].cloneNode(true));
+            }
             return value.substr(cols);
         } else if (value[0] == "\t") {
-            __$(htmlBuilder).append(lang.stringRepeat(this.$tabStrings["\t"], cols));
+            for (i = 0, i_ = cols; i < i_; i++){
+                __$(htmlBuilder).append(this.$tabStrings[value[0]].cloneNode(true));
+            }
             return value.substr(cols);
         }
         return value;
