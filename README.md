@@ -1,5 +1,5 @@
 ### Google Tag Manager Code Editor
-#### v1.1
+#### v1.2
 
 Download and install the [Add-On SDK](https://developer.mozilla.org/en-US/Add-ons/SDK/Tutorials/Installation)
 
