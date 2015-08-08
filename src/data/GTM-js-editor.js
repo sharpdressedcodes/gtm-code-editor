@@ -27,23 +27,28 @@
 
         buildEl: function(){
 
-            this.el = document.createElement("div");
-            this.el.style.position = "relative";
+            this.el = document.createElement('div');
+            this.el.style.position = 'relative';
             this.el.style.zIndex = 999;
-            this.el.id = "maxWidth";
+            this.el.id = 'maxWidth';
 
-            this.editorEl = document.createElement("div");
-            this.editorEl.id = "description";
+            this.editorEl = document.createElement('div');
+            this.editorEl.id = 'description';
 
-            this.toggleEl = document.createElement("div");
-            this.slash = document.createElement("div");
-            this.toggleEl2 = document.createElement("div");
-            this.toggle = document.createElement("div");
+            this.toggleContainer = document.createElement('span');
+            this.toggleEl = document.createElement('span');
+            this.sep = document.createElement('span');
+            this.toggleEl2 = document.createElement('span');
 
-            this.el.appendChild(this.toggle);
-            this.el.appendChild(this.slash);
-            this.el.appendChild(this.toggleEl);
-            this.el.appendChild(this.toggleEl2);
+            this.toggleContainer.appendChild(this.toggleEl);
+            this.toggleContainer.appendChild(this.sep);
+            this.toggleContainer.appendChild(this.toggleEl2);
+
+            var label = document.querySelector('.gtm-text-editor-label');
+
+            if (label !== null){
+                label.appendChild(this.toggleContainer);
+            }
             this.el.appendChild(this.editorEl);
 
             this.initialEl.parentNode.insertBefore(this.el, this.initialEl);
@@ -172,77 +177,51 @@
 
         buildOpt: function (margintop) {
 
-            var ScrollBarWidth = 2,
-                OSName = "Unknown OS",
-                _self = this,
-                css = 'opacity: 0.4; position: absolute; right: 0;z-index: 999; font-size: 12px; margin-top: ' + margintop;
+            var _self = this;
+            var zIndex = parseInt(getComputedStyle(this.el, null)['zIndex'], 10);
 
-            if (navigator.appVersion.indexOf("Mac") != -1) OSName = "MacOS";
+            replaceContent(this.toggleEl2, 'Change Theme');
+            this.toggleEl2.style.cursor = "pointer";
+            this.toggleEl2.style.marginRight = "10px";
 
-            OSName === "MacOS" ? ScrollBarWidth = 17 : ScrollBarWidth = 22;
-
-            function underlineOn(elem) {
-                _self.aceEditor.getTheme() === dark ? document.getElementById(elem).style.borderBottom = "solid white" : document.getElementById(elem).style.borderBottom = "solid black";
-                document.getElementById(elem).style.borderBottomWidth = "1px";
-            }
-
-            function underlineOff(elem) {
-                document.getElementById(elem).style.borderBottom = "";
-            }
-
-            function changeColor() {
-                var tab = ["screen", "slash", "theme", "toggle"],
-                    i;
-
-                if (_self.aceEditor.getTheme() === dark)
-                    for (i = 0; i < tab.length; i++)
-                        document.getElementById(tab[i]).style.color = "white";
-                else
-                    for (i = 0; i < tab.length; i++)
-                        document.getElementById(tab[i]).style.color = "black";
-
-            }
+            replaceContent(this.sep, '-');
+            this.sep.style.marginRight = "10px";
 
             replaceContent(this.toggleEl, 'Screen Size');
-            this.toggleEl.id = "screen";
-            this.toggleEl.style.cssText = css;
             this.toggleEl.style.cursor = "pointer";
-            this.toggleEl.style.marginRight = ScrollBarWidth + "px";
+            this.toggleEl.style.marginRight = "10px";
 
-            this.toggleEl.addEventListener('mouseover', function(){
-                underlineOn("screen");
-            }, false);
-            this.toggleEl.addEventListener('mouseout', function(){
-                underlineOff("screen");
-            }, false);
+            replaceContent(this.toggleContainer, this.toggleEl2);
+            this.toggleContainer.className = 'gtm-ace-toggle-container';
+            this.toggleContainer.appendChild(this.sep);
+            this.toggleContainer.appendChild(this.toggleEl);
 
-            replaceContent(this.slash, '/');
-            this.slash.id = "slash";
-            this.slash.style.cssText = css;
-            this.slash.style.marginRight = ScrollBarWidth + 63 + "px";
-
-            replaceContent(this.toggleEl2, 'Colour Theme');
-            this.toggleEl2.id = "theme";
-            this.toggleEl2.style.cssText = css;
-            this.toggleEl2.style.cursor = "pointer";
-            this.toggleEl2.style.marginRight = ScrollBarWidth + 70 + "px";
-
-            this.toggleEl2.addEventListener('mouseover', function(){
-                underlineOn("theme");
-            }, false);
-            this.toggleEl2.addEventListener('mouseout', function(){
-                underlineOff("theme");
-            }, false);
-            this.toggleEl2.addEventListener('mousemove', function(){
-                underlineOn("theme");
-            }, false);
-
-            replaceContent(this.toggle, 'Toggle:');
-            this.toggle.id = "toggle";
-            this.toggle.style.cssText = css;
-            this.toggle.style.marginRight = ScrollBarWidth + 148 + "px";
-
-            changeColor();
+            switch (this.screenMode){
+                case 'normal':
+                    var label = document.querySelector('.gtm-text-editor-label');
+                    if (this.toggleContainer.parentNode !== label){
+                        this.toggleContainer.parentNode.removeChild(this.toggleContainer);
+                        label.appendChild(this.toggleContainer);
+                    }
+                    this.toggleContainer.style.position = 'relative';
+                    this.toggleContainer.style.zIndex = zIndex + 1;
+                    this.toggleContainer.style.color = '#646464';
+                    this.toggleContainer.style.top = 0;
+                    this.toggleContainer.style.right = 0;
+                    break;
+                case 'full':
+                    if (this.toggleContainer.parentNode !== this.el){
+                        this.toggleContainer.parentNode.removeChild(this.toggleContainer);
+                        this.el.insertBefore(this.toggleContainer, this.editorEl);
+                    }
+                    this.toggleContainer.style.position = 'fixed';
+                    this.toggleContainer.style.zIndex = zIndex + 1;
+                    this.toggleContainer.style.color = _self.aceEditor.getTheme() === dark ? '#dfdfdf' : '#646464';
+                    this.toggleContainer.style.top = margintop;
+                    this.toggleContainer.style.right = '22px';
+                    break;
+                default:
+            }
 
         },
 
@@ -321,7 +300,11 @@
     function loadStyle(){
 
         var el = document.createElement('style');
-        el.textContent = ".ID-html { visibility:hidden }";
+        el.textContent = [
+            '.ID-html {visibility:hidden;}',
+            '.gtm-html-expand-btn-wrapper {display: none;}',
+            '.gtm-ace-toggle-container {font-family: Roboto,Arial,sans-serif; font-weight: 300; font-size: 12px; float: right; line-height: 24px;}'
+        ].join('');
         el.className = STYLE_CLASS;
         document.body.appendChild(el);
 
