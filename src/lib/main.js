@@ -6,7 +6,17 @@ var worker = null;
 const regex = /http(s)?:\/\/(www|tagmanager)\.google\.com(\/tagmanager)?\/*/;
 const contentScriptFiles = [
     self.data.url('GTM-js-editor.js'),
-    self.data.url('ace/ace.js')
+    self.data.url('ace/ace.js'),
+    self.data.url('ace/worker-css.js'),
+    self.data.url('ace/worker-xml.js'),
+    self.data.url('ace/worker-javascript.js'),
+    self.data.url('ace/worker-html.js'),
+    self.data.url('ace/mode-css.js'),
+    self.data.url('ace/mode-xml.js'),
+    self.data.url('ace/mode-javascript.js'),
+    self.data.url('ace/mode-html.js'),
+    self.data.url('ace/theme-dawn.js'),
+    self.data.url('ace/theme-monokai.js')
 ];
 
 tabs.on('ready', function(tab){

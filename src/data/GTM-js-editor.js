@@ -2,8 +2,8 @@
 
 (function(){
 
-    const bright = "ace/theme/ace-dawn";
-    const dark = "ace/theme/monokai";
+    const bright = 'ace/theme/dawn';
+    const dark = 'ace/theme/monokai';
     const STYLE_CLASS = 'gtm-code-editor';
     var prettyPrinter = null;
 
@@ -36,6 +36,7 @@
 
             this.editorEl = document.createElement('div');
             this.editorEl.id = 'description';
+            this.editorEl.style.outline = '1px solid #EBEBEB';
 
             this.toggleContainer = document.createElement('span');
             this.toggleEl = document.createElement('span');
@@ -114,19 +115,21 @@
 
         buildAce: function () {
 
-            this.aceEditor = ace.edit("description");
+            this.aceEditor = ace.edit('description');
             this.aceSession = this.aceEditor.getSession();
+            this.aceEditor.$blockScrolling = Infinity;
+            this.aceEditor.setShowPrintMargin(false);
+            this.aceSession.setUseWorker(false);
             this.aceSession.setMode('ace/mode/' + (this.isHtml ? 'html' : 'javascript'));
             this.aceSession.setValue(this.isLegacy ? this.initialEl.value : this.getCodeFromCodeMirror());
             this.aceSession.setFoldStyle('markbeginend');
 
-            this.aceSession.on("change", function () {
+            this.aceSession.on('change', function () {
                 if (!this.isLegacy) {
                     this.setCodeInCodeMirror();
                 } else {
                     this.initialEl.value = this.aceSession.getValue();
                 }
-                this.aceSession.setUseWorker(false);
             }.bind(this));
 
         },
