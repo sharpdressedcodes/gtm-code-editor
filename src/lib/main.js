@@ -1,3 +1,5 @@
+'use strict';
+
 var tabs = require('sdk/tabs');
 var self = require('sdk/self');
 var worker = null;

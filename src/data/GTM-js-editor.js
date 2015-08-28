@@ -1,3 +1,5 @@
+'use strict';
+
 (function(){
 
     const bright = "ace/theme/ace-dawn";
