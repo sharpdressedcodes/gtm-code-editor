@@ -2,9 +2,48 @@
 
 (function(){
 
-    const bright = 'ace/theme/dawn';
-    const dark = 'ace/theme/monokai';
+    const aceThemes = [
+        'ambiance',
+        'chaos',
+        'chrome',
+        'clouds',
+        'clouds_midnight',
+        'cobalt',
+        'crimson_editor',
+        'dawn',
+        'dreamweaver',
+        'eclipse',
+        'github',
+        'idle_fingers',
+        'iplastic',
+        'katzenmilch',
+        'kr_theme',
+        'kuroir',
+        'merbivore',
+        'merbivore_soft',
+        'mono_industrial',
+        'monokai',
+        'pastel_on_dark',
+        'solarized_dark',
+        'solarized_light',
+        'sqlserver',
+        'terminal',
+        'textmate',
+        'tomorrow',
+        'tomorrow_night',
+        'tomorrow_night_blue',
+        'tomorrow_night_bright',
+        'tomorrow_night_eighties',
+        'twilight',
+        'vibrant_ink',
+        'xcode'
+    ];
+    const THEME_PREFIX = 'ace/theme/';
+    const DEFAULT_THEME = 'monokai';
     const STYLE_CLASS = 'gtm-code-editor';
+    const CONTAINER_OUTER_ID = 'ace-outer-container';
+    const CONTAINER_INNER_ID = 'ace-inner-container';
+    const DEFAULT_FORECOLOUR = '#646464';
     var prettyPrinter = null;
 
     var PrettyPrinter = function(options){
@@ -32,20 +71,33 @@
             this.el = document.createElement('div');
             this.el.style.position = 'relative';
             this.el.style.zIndex = 999;
-            this.el.id = 'maxWidth';
+            this.el.id = CONTAINER_OUTER_ID;
 
             this.editorEl = document.createElement('div');
-            this.editorEl.id = 'description';
+            this.editorEl.id = CONTAINER_INNER_ID;
             this.editorEl.style.outline = '1px solid #EBEBEB';
 
             this.toggleContainer = document.createElement('span');
-            this.toggleEl = document.createElement('span');
-            this.sep = document.createElement('span');
-            this.toggleEl2 = document.createElement('span');
 
+            var theme = localStorage.getItem('theme');
+
+            this.cboTheme = document.createElement('select');
+            this.cboTheme.style.marginBottom = '5px';
+            this.cboTheme.style.marginRight = '2px';
+
+            for (var i = 0, i_ = aceThemes.length; i < i_; i++){
+                var option = document.createElement('option');
+                option.textContent = aceThemes[i];
+                if (theme !== null && theme === (THEME_PREFIX + aceThemes[i])){
+                    option.setAttribute('selected', 'selected')
+                }
+                this.cboTheme.appendChild(option);
+            }
+
+            this.toggleEl = document.createElement('span');
+
+            this.toggleContainer.appendChild(this.cboTheme);
             this.toggleContainer.appendChild(this.toggleEl);
-            this.toggleContainer.appendChild(this.sep);
-            this.toggleContainer.appendChild(this.toggleEl2);
 
             var label = document.querySelector('.gtm-text-editor-label');
 
@@ -63,7 +115,9 @@
 
         initScreen: function () {
 
-            this.toggleEl.addEventListener('click', this.toggle1.bind(this), false);
+            if (this.isLegacy){
+                this.toggleEl.addEventListener('click', this.toggle1.bind(this), false);
+            }
 
             document.addEventListener('keydown', function(evt){
                 evt = evt || unsafeWindow.event;
@@ -75,20 +129,19 @@
 
         initTheme: function () {
 
-            this.toggleEl2.addEventListener('click', this.toggle2.bind(this), false);
+            this.cboTheme.addEventListener('change', this.onThemeChange.bind(this), false);
+            //this.cboTheme.addEventListener('mouseup', this.onThemeChange.bind(this), false);
+            this.cboTheme.addEventListener('keydown', this.onThemeChange.bind(this), false);
 
-            if (!localStorage.getItem("theme")) {
-                this.aceEditor.setTheme(dark);
-                localStorage.setItem("theme", dark);
-            } else {
-                if (localStorage.getItem("theme") === dark){
-                    this.aceEditor.setTheme(dark);
-                    localStorage.setItem("theme", dark);
-                } else {
-                    this.aceEditor.setTheme(bright);
-                    localStorage.setItem("theme", bright);
-                }
+            var theme = localStorage.getItem('theme');
+            if (theme === null){
+                theme = THEME_PREFIX + DEFAULT_THEME;
+                localStorage.setItem('theme', theme);
             }
+
+            this.aceEditor.setTheme(theme);
+            this.cboTheme.selectedIndex = aceThemes.indexOf(theme.replace(THEME_PREFIX, ''));
+
         },
 
         getCodeMirrorInstance: function(){
@@ -115,14 +168,14 @@
 
         buildAce: function () {
 
-            this.aceEditor = ace.edit('description');
+            this.aceEditor = ace.edit(CONTAINER_INNER_ID);
             this.aceSession = this.aceEditor.getSession();
             this.aceEditor.$blockScrolling = Infinity;
             this.aceEditor.setShowPrintMargin(false);
             this.aceSession.setUseWorker(false);
             this.aceSession.setMode('ace/mode/' + (this.isHtml ? 'html' : 'javascript'));
             this.aceSession.setValue(this.isLegacy ? this.initialEl.value : this.getCodeFromCodeMirror());
-            this.aceSession.setFoldStyle('markbeginend');
+            //this.aceSession.setFoldStyle('markbeginend');
 
             this.aceSession.on('change', function () {
                 if (!this.isLegacy) {
@@ -138,16 +191,17 @@
             (this.screenMode === "normal" ? this.fullScreen() : this.normalScreen());
         },
 
-        toggle2: function () {
+        onThemeChange: function() {
 
-            if (localStorage.getItem("theme") === bright){
-                this.aceEditor.setTheme(dark);
-                localStorage.setItem("theme", dark);
-            } else {
-                this.aceEditor.setTheme(bright);
-                localStorage.setItem("theme", bright);
-            }
-            this.buildOpt(this.margintop);
+            setTimeout(function(){
+                var theme = THEME_PREFIX + this.cboTheme.selectedOptions[0].value;
+                var currentTheme = localStorage.getItem('theme');
+                if (currentTheme !== theme){
+                    localStorage.setItem('theme', theme);
+                    this.aceEditor.setTheme(theme);
+                }
+            }.bind(this), 100);
+
         },
 
         fullScreen: function () {
@@ -182,23 +236,34 @@
 
         buildOpt: function (margintop) {
 
-            var _self = this;
             var zIndex = parseInt(getComputedStyle(this.el, null)['zIndex'], 10);
+            var gtmLabel = document.querySelector('label[for="4-tag.data.vendorTemplate.param.html"]');
+            var foreColour = gtmLabel ? getComputedStyle(gtmLabel)['color'] : DEFAULT_FORECOLOUR;
+            var old = document.querySelector('.gtm-html-expand-btn');
 
-            replaceContent(this.toggleEl2, 'Change Theme');
-            this.toggleEl2.style.cursor = "pointer";
-            this.toggleEl2.style.marginRight = "10px";
+            if (this.isLegacy){
+                replaceContent(this.toggleEl, 'Full Screen');
+            } else {
+                if (old){
+                    var clone = old.cloneNode(true);
+                    clone.id = 'gtm-ace-full-screen';
+                    clone.setAttribute('title', 'Full Screen');
+                    clone.removeAttribute('data-ng-click');
+                    clone.removeAttribute('data-ng-if');
+                    clone.addEventListener('click', this.toggle1.bind(this), false);
+                    replaceContent(this.toggleEl, clone);
+                } else {
+                    replaceContent(this.toggleEl, 'Full Screen');
+                }
 
-            replaceContent(this.sep, '-');
-            this.sep.style.marginRight = "10px";
+            }
 
-            replaceContent(this.toggleEl, 'Screen Size');
-            this.toggleEl.style.cursor = "pointer";
-            this.toggleEl.style.marginRight = "10px";
+            //replaceContent(this.toggleEl, 'Screen Size');
+            this.toggleEl.style.cursor = 'pointer';
+            //this.toggleEl.style.marginRight = '2px';
+            this.toggleEl.style.marginLeft = '3px';
 
-            replaceContent(this.toggleContainer, this.toggleEl2);
             this.toggleContainer.className = 'gtm-ace-toggle-container';
-            this.toggleContainer.appendChild(this.sep);
             this.toggleContainer.appendChild(this.toggleEl);
 
             switch (this.screenMode){
@@ -210,21 +275,21 @@
                     }
                     this.toggleContainer.style.position = 'relative';
                     this.toggleContainer.style.zIndex = zIndex + 1;
-                    this.toggleContainer.style.color = '#646464';
+                    this.toggleContainer.style.color = foreColour;
                     this.toggleContainer.style.top = 0;
                     this.toggleContainer.style.right = 0;
                     break;
-                case 'full':
-                    if (this.toggleContainer.parentNode !== this.el){
-                        this.toggleContainer.parentNode.removeChild(this.toggleContainer);
-                        this.el.insertBefore(this.toggleContainer, this.editorEl);
-                    }
-                    this.toggleContainer.style.position = 'fixed';
-                    this.toggleContainer.style.zIndex = zIndex + 1;
-                    this.toggleContainer.style.color = _self.aceEditor.getTheme() === dark ? '#dfdfdf' : '#646464';
-                    this.toggleContainer.style.top = margintop;
-                    this.toggleContainer.style.right = '22px';
-                    break;
+                //case 'full':
+                //    //if (this.toggleContainer.parentNode !== this.el){
+                //    //    this.toggleContainer.parentNode.removeChild(this.toggleContainer);
+                //    //    this.el.insertBefore(this.toggleContainer, this.editorEl);
+                //    //}
+                //    //this.toggleContainer.style.position = 'fixed';
+                //    //this.toggleContainer.style.zIndex = zIndex + 1;
+                //    //this.toggleContainer.style.color = getComputedStyle(this.editorEl, null)['color'];
+                //    //this.toggleContainer.style.top = margintop;
+                //    //this.toggleContainer.style.right = '22px';
+                //    break;
                 default:
             }
 
@@ -308,7 +373,9 @@
         el.textContent = [
             '.ID-html {visibility:hidden;}',
             '.gtm-html-expand-btn-wrapper {display: none;}',
-            '.gtm-ace-toggle-container {font-family: Roboto,Arial,sans-serif; font-weight: 300; font-size: 12px; float: right; line-height: 24px;}'
+            '.gtm-ace-toggle-container {font-family: Roboto,Arial,sans-serif; font-weight: 300; font-size: 12px; float: right; line-height: 24px;}',
+            '.gtm-ace-toggle-container select {height: auto; min-width: auto; padding: 0;}',
+            '.gtm-ace-toggle-container .gtm-html-expand-btn {display: inline-block; position: relative; top: -1px; right: auto; padding: 0; font-size: 18px; transform: scaleY(-1); border-radius: 2px; border: 1px solid #c1c1c1; vertical-align: sub;}'
         ].join('');
         el.className = STYLE_CLASS;
         document.body.appendChild(el);
@@ -371,30 +438,8 @@
             }
         }
 
-        var item = localStorage.getItem('theme');
-        var theme = item !== null && item !== dark ? 'default' : 'monokai';
-
         // Also style the code preview element.
-        if (theme === 'monokai'){
-            els = [].slice.call(document.querySelectorAll('.cm-s-default'));
-            for (i = 0, i_ = els.length; i < i_; i++){
-                els[i].className = els[i].className.replace('cm-s-default', 'cm-s-monokai');
-            }
-        } else {
-            els = [].slice.call(document.querySelectorAll('.cm-s-monokai'));
-            for (i = 0, i_ = els.length; i < i_; i++){
-                els[i].className = els[i].className.replace('cm-s-monokai', 'cm-s-default');
-            }
-        }
-
-        // GTM has a mouseover effect for each 'step'. When the dark theme is selected,
-        // the background goes white during mouseover. Setting the background-color
-        // to !important fixes this issue.
-        var colour = (theme === 'monokai' ? '272822' : 'ffffff');
-        els = [].slice.call(document.querySelectorAll('[class*="cm-s-"]'));
-        for (i = 0, i_ = els.length; i < i_; i++){
-            els[i].setAttribute('style', 'background-color: #' + colour + '!important');
-        }
+        replaceCodePreview();
 
         return {
             initialEl: initialEl,
@@ -404,13 +449,87 @@
 
     }
 
+    function replaceCodePreview(){
+
+        var item = localStorage.getItem('theme');
+        var theme = item === null ? THEME_PREFIX + DEFAULT_THEME : item;
+        var test = document.querySelector('.codemirror-inline');
+
+        if (test && !document.getElementById('ace-inline')){
+
+            var ta = document.createElement('div');
+            ta.id = 'ace-inline';
+            ta.appendChild(document.createTextNode(unsafeWindow.angular.element('.CodeMirror')[0].CodeMirror.getValue()));
+
+            var style = unsafeWindow.getComputedStyle(test, null);
+            var w = style['width'];
+            var h = (parseInt(style['height'].replace('px'), 10) + 20) + 'px';
+            ta.style.width = w;
+            ta.style.height = h;
+            ta.style.position = 'relative';
+            ta.style.zIndex = 9999;
+
+            test.style.display = 'none';
+            var p = findParent(test, 'td');
+            p.insertBefore(ta, p.firstChild);
+
+            var editor = ace.edit('ace-inline');
+            editor.setTheme(theme);
+            editor.getSession().setMode('ace/mode/html');
+            editor.$blockScrolling = Infinity;
+            editor.setShowPrintMargin(false);
+            editor.getSession().setUseWorker(false);
+            editor.setReadOnly(true);
+
+            unsafeWindow.getComputedStyle(ta, null);
+            var div = document.createElement('div');
+            div.style.width = w;
+            div.style.height = h;
+            div.style.cursor = 'pointer';
+            div.style.position = 'relative';
+            div.style.zIndex = 99999;
+            div.addEventListener('click', function(event){
+                forceLoad();
+            }, false);
+            ta.appendChild(div);
+
+            // wait for ace to kick in, then remove the code folding arrows
+            var interval = setInterval(function(){
+                var items = [].slice.call(ta.querySelectorAll('.ace_fold-widget'));
+                if (items.length > 0){
+                    clearInterval(interval);
+                    items.forEach(function(item){
+                        console.log('removed ', item);
+                        item.parentNode.removeChild(item);
+                    });
+                    var el =  ta.querySelector('.ace_folding-enabled');
+                    if (el){
+                        el.className = el.className.replace('ace_folding-enabled').trim();
+                    }
+                }
+            }, 500);
+
+        }
+
+    }
+
+    function findParent(element, tagName){
+
+        while (element.tagName.toLowerCase() !== tagName.toLowerCase()){
+            element = element.parentNode;
+        }
+
+        return element;
+
+    }
+
     function loadEditor() {
 
         var data = findElement();
 
         if (data.initialEl &&
             data.initialEl.style.display !== 'none' &&
-            document.getElementById('maxWidth') === null){
+            document.getElementById(CONTAINER_OUTER_ID) === null){
             prettyPrinter = new PrettyPrinter(data);
         }
 
@@ -419,7 +538,7 @@
     function unloadEditor(){
 
         var data = findElement();
-        var el = document.getElementById('maxWidth');
+        var el = document.getElementById(CONTAINER_OUTER_ID);
 
         if (data.initialEl && el !== null){
             prettyPrinter = null;
@@ -437,15 +556,9 @@
 
     function forceLoad() {
 
-        waitAndLoad(40);
-        waitAndLoad(10);
-        waitAndLoad(200);
         waitAndLoad(500);
-        waitAndLoad(1000);
         waitAndLoad(2000);
         waitAndLoad(5000);
-        waitAndLoad(10000);
-        waitAndLoad(15000);
 
     }
 
